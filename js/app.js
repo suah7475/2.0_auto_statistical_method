@@ -758,9 +758,26 @@ window.AutoStat.App = {
 
         var mappingDiv = document.getElementById('webr-variable-mapping');
         var html = '<h4>분석 변수 매핑</h4>';
-        html += '<p class="help-text">통계 분석에 필요한 변수를 선택하세요</p>';
+        html += '<p class="help-text">통계 분석에 필요한 변수를 선택하세요. 유형이 잘못 감지된 경우 직접 수정하세요.</p>';
 
         var headers = this.uploadedHeaders;
+        var colTypes = this.webrColumnTypes || {};
+
+        // 유형 선택 드롭다운 HTML 생성 헬퍼
+        function typeSelectHtml(attrName, attrVal, detectedType) {
+            var opts = [
+                ['', '유형'],
+                ['continuous', '연속형'],
+                ['categorical', '범주형'],
+                ['ordinal', '순서형']
+            ];
+            var html = '<select class="type-select" ' + attrName + '="' + attrVal + '">';
+            opts.forEach(function(o) {
+                var sel = (detectedType === o[0]) ? ' selected' : '';
+                html += '<option value="' + o[0] + '"' + sel + '>' + o[1] + '</option>';
+            });
+            return html + '</select>';
+        }
 
         // 필수 변수
         if (requirements.variables) {
@@ -768,24 +785,31 @@ window.AutoStat.App = {
                 html += '<div class="mapping-group">';
                 html += '<label class="mapping-label">' + v.label + ' *</label>';
                 if (v.help) html += '<span class="mapping-help">' + v.help + '</span>';
+                html += '<div class="mapping-row">';
                 html += '<select class="mapping-select" data-role="' + v.role + '">';
                 html += '<option value="">-- 선택 --</option>';
                 headers.forEach(function(h) {
                     html += '<option value="' + h + '">' + h + '</option>';
                 });
-                html += '</select></div>';
+                html += '</select>';
+                html += typeSelectHtml('data-type-role', v.role, '');
+                html += '</div></div>';
             });
         }
 
-        // 다중 IV (체크박스)
+        // 다중 IV (체크박스) - 각 항목에 유형 선택 추가
         if (requirements.multiIV) {
             html += '<div class="mapping-group">';
             html += '<label class="mapping-label">' + (requirements.multiIVLabel || '독립변수') + '</label>';
             if (requirements.multiIVHelp) html += '<span class="mapping-help">' + requirements.multiIVHelp + '</span>';
             html += '<div class="mapping-checkboxes" id="webr-multi-iv">';
             headers.forEach(function(h) {
-                html += '<div class="checkbox-item"><input type="checkbox" value="' + h + '" id="webr-iv-' + h + '">';
-                html += '<label for="webr-iv-' + h + '">' + h + '</label></div>';
+                var detected = colTypes[h] || '';
+                html += '<div class="checkbox-item">';
+                html += '<input type="checkbox" value="' + h + '" id="webr-iv-' + h + '">';
+                html += '<label for="webr-iv-' + h + '">' + h + '</label>';
+                html += typeSelectHtml('data-type-iv', h, detected);
+                html += '</div>';
             });
             html += '</div></div>';
         }
@@ -797,12 +821,15 @@ window.AutoStat.App = {
                 html += '<div class="mapping-group mapping-optional">';
                 html += '<label class="mapping-label">' + v.label + '</label>';
                 if (v.help) html += '<span class="mapping-help">' + v.help + '</span>';
+                html += '<div class="mapping-row">';
                 html += '<select class="mapping-select" data-role="' + v.role + '">';
                 html += '<option value="">-- 선택 안 함 --</option>';
                 headers.forEach(function(h) {
                     html += '<option value="' + h + '">' + h + '</option>';
                 });
-                html += '</select></div>';
+                html += '</select>';
+                html += typeSelectHtml('data-type-role', v.role, '');
+                html += '</div></div>';
             });
         }
 
@@ -835,6 +862,18 @@ window.AutoStat.App = {
         mappingDiv.innerHTML = html;
         mappingDiv.style.display = 'block';
         document.getElementById('file-action-buttons').style.display = 'flex';
+
+        // 변수 선택 시 감지된 유형 자동 반영
+        var self = this;
+        mappingDiv.querySelectorAll('.mapping-select[data-role]').forEach(function(varSel) {
+            var role = varSel.getAttribute('data-role');
+            var typeSel = mappingDiv.querySelector('.type-select[data-type-role="' + role + '"]');
+            if (!typeSel) return;
+            varSel.addEventListener('change', function() {
+                var detected = (self.webrColumnTypes || {})[varSel.value] || '';
+                typeSel.value = detected;
+            });
+        });
     },
 
     // ==================== [NEW] WebR 분석 실행 ====================
@@ -860,6 +899,20 @@ window.AutoStat.App = {
         var extras = {};
         document.querySelectorAll('#webr-variable-mapping [data-extra]').forEach(function(el) {
             extras[el.getAttribute('data-extra')] = el.value;
+        });
+
+        // 변수 유형 오버라이드 수집 (자동감지 + 사용자 수정 반영)
+        var columnTypes = Object.assign({}, this.webrColumnTypes);
+        // 단일 변수 유형 선택
+        document.querySelectorAll('#webr-variable-mapping .type-select[data-type-role]').forEach(function(sel) {
+            if (!sel.value) return;
+            var role = sel.getAttribute('data-type-role');
+            var varSel = document.querySelector('#webr-variable-mapping .mapping-select[data-role="' + role + '"]');
+            if (varSel && varSel.value) columnTypes[varSel.value] = sel.value;
+        });
+        // 다중 IV 체크박스별 유형 선택
+        document.querySelectorAll('#webr-multi-iv .type-select[data-type-iv]').forEach(function(sel) {
+            if (sel.value) columnTypes[sel.getAttribute('data-type-iv')] = sel.value;
         });
 
         // 필수 변수 검증
@@ -939,7 +992,7 @@ window.AutoStat.App = {
                 vars: vars,
                 extras: extras,
                 multiIV: multiIVList,
-                columnTypes: this.webrColumnTypes
+                columnTypes: columnTypes
             };
 
             var adapted;

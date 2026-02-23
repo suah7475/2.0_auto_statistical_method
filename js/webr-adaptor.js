@@ -71,6 +71,9 @@ window.AutoStat.WebRAdaptor = {
         // 5. 단계별 분리
         var steps = this.splitIntoSteps(code);
 
+        // 5.5. 변수 유형 변환 코드 삽입 (사용자 지정 유형을 steps에 직접 추가)
+        steps = this.insertNumericConversion(steps, params);
+
         // 6. removeInstallCode가 library() 호출을 제거하므로,
         //    패키지 로드 코드를 첫 번째 step 앞에 재삽입.
         //    ※ 실제 설치는 executeSteps(steps, packages)가 JS API로 먼저 처리함
@@ -141,19 +144,12 @@ window.AutoStat.WebRAdaptor = {
 
     replaceFilePath: function(rCode) {
         var vfsPath = this.VFS_DATA_PATH;
-        var cleanCall = 'read.csv("' + vfsPath + '", header = TRUE, fileEncoding = "UTF-8")';
+        // na.strings: 빈 셀("") 및 "NA" 문자열을 R의 NA로 변환 → 숫자 컬럼이 character로 읽히는 문제 방지
+        // 원본 코드에는 na.strings가 없으므로 [^)]* 정규식이 안전하게 동작함
+        var cleanCall = 'read.csv("' + vfsPath + '", header = TRUE, fileEncoding = "UTF-8", na.strings = c("", "NA"))';
 
-        // read.csv(...) 전체를 통째로 치환 (중첩 괄호 없으므로 안전)
-        rCode = rCode.replace(
-            /read\.csv\([^)]*\)/g,
-            cleanCall
-        );
-
-        // read_excel(...) → read.csv(...) 전체 치환
-        rCode = rCode.replace(
-            /read_excel\([^)]*\)/g,
-            cleanCall
-        );
+        rCode = rCode.replace(/read\.csv\([^)]*\)/g, cleanCall);
+        rCode = rCode.replace(/read_excel\([^)]*\)/g, cleanCall);
 
         return rCode;
     },
@@ -183,6 +179,64 @@ window.AutoStat.WebRAdaptor = {
         // WebR(R 4.2+)에서는 |> 가 기본 제공 → 패키지 의존성 없음
         // 주석이나 문자열 내 %>% 도 교체되지만 기능에 영향 없음
         return rCode.replace(/%>%/g, '|>');
+    },
+
+    // ────────────── 변수 유형 변환 코드 삽입 ──────────────
+    // steps 배열의 "preprocess" 또는 "load" step 끝에 as.numeric/as.factor 변환 코드를 추가.
+    // 원본 R 코드 문자열을 건드리지 않으므로 정규식 충돌 없음.
+
+    insertNumericConversion: function(steps, params) {
+        if (!params || !params.columnTypes || !steps || steps.length === 0) return steps;
+
+        // 실제 분석에 사용되는 컬럼만 변환 (사용자가 선택한 변수)
+        var usedCols = [];
+        if (params.vars) {
+            Object.keys(params.vars).forEach(function(role) {
+                if (params.vars[role]) usedCols.push(params.vars[role]);
+            });
+        }
+        if (params.multiIV && Array.isArray(params.multiIV)) {
+            usedCols = usedCols.concat(params.multiIV);
+        }
+        // 중복 제거
+        usedCols = usedCols.filter(function(c, i, a) { return c && a.indexOf(c) === i; });
+
+        var colTypes = params.columnTypes;
+        var lines = [];
+        usedCols.forEach(function(col) {
+            var type = colTypes[col];
+            if (!type) return;
+            var bt = '`' + col + '`';
+            if (type === 'continuous') {
+                lines.push('if (!is.numeric(df$' + bt + ')) df$' + bt + ' <- suppressWarnings(as.numeric(as.character(df$' + bt + ')))');
+            } else if (type === 'categorical') {
+                lines.push('if (!is.factor(df$' + bt + ')) df$' + bt + ' <- as.factor(df$' + bt + ')');
+            } else if (type === 'ordinal') {
+                lines.push('if (!is.ordered(df$' + bt + ')) df$' + bt + ' <- as.ordered(as.factor(df$' + bt + '))');
+            }
+        });
+
+        if (lines.length === 0) return steps;
+
+        var convCode = '# 변수 유형 변환 (사용자 지정)\n' + lines.join('\n');
+
+        // "preprocess" step 우선, 없으면 "load" step에 추가
+        var targetIdx = -1;
+        for (var i = 0; i < steps.length; i++) {
+            if (steps[i].id === 'preprocess') { targetIdx = i; break; }
+        }
+        if (targetIdx === -1) {
+            for (var j = 0; j < steps.length; j++) {
+                if (steps[j].id === 'load') { targetIdx = j; break; }
+            }
+        }
+        if (targetIdx === -1 && steps.length > 0) targetIdx = 0;
+
+        if (targetIdx !== -1) {
+            steps[targetIdx].code = steps[targetIdx].code + '\n\n' + convCode;
+        }
+
+        return steps;
     },
 
     // ────────────── 코드 단계 분리 ──────────────

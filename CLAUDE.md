@@ -153,10 +153,11 @@ RCodeGenerators (원본 R 코드)
 
 #### WebR Adaptor (`js/webr-adaptor.js`)
 - `removeInstallCode()`: install.packages/library 코드 제거
-- `replaceFilePath()`: 로컬 경로 → VFS 경로 (`/home/web_user/data.csv`) 치환
-- `replaceReadExcel()`: read_excel → read.csv 치환
+- `replaceFilePath()`: 로컬 경로 → VFS 경로 (`/home/web_user/data.csv`) 치환, `na.strings = c("", "NA")` 추가 (빈 셀 NA 처리)
+- `replaceReadExcel()`: read_excel 잔여 코드 제거
 - `replaceWithNativePipe()`: `%>%` → `|>` 네이티브 파이프 변환 (R 4.1+)
 - `splitIntoSteps()`: 섹션 헤더 기반 단계 분리 (id 매핑 + export 제외)
+- `insertNumericConversion()`: 사용자 지정 변수 유형을 steps에 직접 삽입 (`as.numeric`/`as.factor`/`as.ordered`)
 
 #### WebR Runner (`js/webr-runner.js`)
 - PostMessage 채널 사용 (COOP/COEP 헤더 불필요, GitHub Pages 호환)

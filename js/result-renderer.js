@@ -324,10 +324,11 @@ window.AutoStat.ResultRenderer = {
     _looksLikeTable: function(text) {
         var lines = text.trim().split('\n');
         if (lines.length < 2) return false;
-        // 탭이나 여러 공백으로 구분된 행이 2개 이상
+        // 탭으로 구분된 행이 2개 이상인 경우에만 테이블로 처리
+        // (공백 정렬 출력을 테이블로 변환하면 열 정렬이 깨지므로 탭만 감지)
         var tabCount = 0;
         for (var i = 0; i < Math.min(lines.length, 5); i++) {
-            if (/\t/.test(lines[i]) || /\s{2,}/.test(lines[i])) tabCount++;
+            if (/\t/.test(lines[i])) tabCount++;
         }
         return tabCount >= 2;
     },
@@ -341,7 +342,7 @@ window.AutoStat.ResultRenderer = {
             table.className = 'result-table';
 
             for (var i = 0; i < lines.length; i++) {
-                var cells = lines[i].trim().split(/\s{2,}|\t/);
+                var cells = lines[i].trim().split(/\t/);
                 var row = document.createElement('tr');
 
                 for (var j = 0; j < cells.length; j++) {
