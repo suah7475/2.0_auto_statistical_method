@@ -17,6 +17,7 @@ window.AutoStat.App = {
     webrVariableMapping: {},
     webrMultiIVSelections: [],
     webrExtraValues: {},
+    webrCancelled: false,  // WebR 분석 진행 중 취소 플래그
 
     // 진입 모드: 'flow' | 'browse'
     entryMode: null,
@@ -43,11 +44,11 @@ window.AutoStat.App = {
         var self = this;
 
         // 초기 모드 선택 카드
-        document.getElementById('entry-flow').addEventListener('click', function() {
+        this._bindActivate(document.getElementById('entry-flow'), function() {
             self._startFlowMode();
         });
 
-        document.getElementById('entry-browse').addEventListener('click', function() {
+        this._bindActivate(document.getElementById('entry-browse'), function() {
             self._startBrowseMode();
         });
 
@@ -78,11 +79,11 @@ window.AutoStat.App = {
         });
 
         // [NEW] 모드 선택 카드
-        document.getElementById('mode-webr').addEventListener('click', function() {
+        this._bindActivate(document.getElementById('mode-webr'), function() {
             self._selectMode('webr');
         });
 
-        document.getElementById('mode-code').addEventListener('click', function() {
+        this._bindActivate(document.getElementById('mode-code'), function() {
             self._selectMode('code');
         });
 
@@ -134,6 +135,7 @@ window.AutoStat.App = {
         var btnCancelLoading = document.getElementById('btn-cancel-loading');
         if (btnCancelLoading) {
             btnCancelLoading.addEventListener('click', function() {
+                self.webrCancelled = true;  // 진행 중인 분석 흐름 중단
                 self._fallbackToCodeMode();
             });
         }
@@ -224,7 +226,7 @@ window.AutoStat.App = {
         var self = this;
         var cards = container.querySelectorAll('.option-card');
         cards.forEach(function(card) {
-            card.addEventListener('click', function() {
+            self._bindActivate(card, function() {
                 var qId = this.getAttribute('data-question');
                 var val = self._decodeValue(this.getAttribute('data-value'));
                 var isMulti = this.getAttribute('data-multi') === 'true';
@@ -410,7 +412,7 @@ window.AutoStat.App = {
 
         // 클릭 이벤트
         container.querySelectorAll('.browse-test-card').forEach(function(card) {
-            card.addEventListener('click', function() {
+            self._bindActivate(card, function() {
                 var testId = this.getAttribute('data-testid');
                 self._showResultForTest(testId);
             });
@@ -560,7 +562,7 @@ window.AutoStat.App = {
                 '<div class="alt-reason">' + self._stripEmoji(alt.reason || '') + '</div>' +
                 '<div class="alt-desc">' + alt.simple_description + '</div>';
 
-            card.addEventListener('click', function() {
+            self._bindActivate(card, function() {
                 self._switchToTest(alt.id);
             });
 
@@ -933,6 +935,7 @@ window.AutoStat.App = {
         }
 
         // UI: 로딩 표시
+        this.webrCancelled = false;  // 새 분석 시작 시 취소 플래그 초기화
         document.getElementById('file-upload-section').style.display = 'none';
         document.getElementById('analysis-mode-section').style.display = 'none';
         document.getElementById('webr-loading-section').style.display = 'block';
@@ -963,6 +966,7 @@ window.AutoStat.App = {
         try {
             // 1. WebR 초기화
             var initOk = await Runner.init();
+            if (this.webrCancelled) return;  // 로딩 중 취소됨
             if (!initOk) {
                 // 실제 에러 메시지를 표시
                 var detail = lastRunnerError || '알 수 없는 오류';
@@ -979,10 +983,12 @@ window.AutoStat.App = {
             // 2. 필요 패키지 설치
             var requiredPkgs = Adaptor.getRequiredPackages(primary.id);
             await Runner.ensurePackages(requiredPkgs);
+            if (this.webrCancelled) return;
 
             // 3. 데이터 파일을 VFS에 쓰기
             this._updateWebRProgress(50, '데이터 업로드 중...');
             await Runner.writeFileToVFS('data.csv', this.uploadedCSV);
+            if (this.webrCancelled) return;
 
             // 4. R 코드 생성 (파라미터 이름 정확히 맞춤)
             this._updateWebRProgress(55, 'R 코드 준비 중...');
@@ -1024,6 +1030,7 @@ window.AutoStat.App = {
             // 6. 단계별 R 코드 실행 (패키지 목록 전달 → executeSteps가 JS API로 설치+로드 보장)
             this._updateWebRProgress(60, '분석 실행 중...');
             results = await Runner.executeSteps(separated.otherSteps, adapted.packages);
+            if (this.webrCancelled) return;
 
             // 7. 시각화 실행 (별도)
             if (separated.plotStep) {
@@ -1045,6 +1052,9 @@ window.AutoStat.App = {
             console.error('WebR 분석 오류:', e);
             errorMessages.push(e.message);
         }
+
+        // 취소된 경우 결과 뷰어를 띄우지 않음 (코드 모드 화면 유지)
+        if (this.webrCancelled) return;
 
         // === 결과 뷰어 항상 표시 (부분 결과라도 보여줌) ===
         this._showResultViewer(results, plotImages, rawCode, primary.name, errorMessages);
@@ -1324,6 +1334,7 @@ window.AutoStat.App = {
     },
 
     _renderPapers: function(result) {
+        var self = this;
         var container = document.getElementById('papers-list');
         container.innerHTML = '';
 
@@ -1337,12 +1348,12 @@ window.AutoStat.App = {
         if (!result.papers || result.papers.length === 0) {
             var msg = result.message || '검색 결과가 없습니다.';
             var html = '<div class="no-papers">';
-            html += '<p>' + msg + '</p>';
+            html += '<p>' + self._escapeHtml(msg) + '</p>';
             if (result.sci_filtered) {
                 html += '<p>SCI-E 필터를 해제하면 더 많은 결과를 볼 수 있습니다.</p>';
             }
             if (result.search_url) {
-                html += '<p><a href="' + result.search_url + '" target="_blank">PubMed에서 직접 검색하기</a></p>';
+                html += '<p><a href="' + self._escapeHtml(result.search_url) + '" target="_blank" rel="noopener">PubMed에서 직접 검색하기</a></p>';
             }
             html += '</div>';
             container.innerHTML += html;
@@ -1353,8 +1364,9 @@ window.AutoStat.App = {
             var card = document.createElement('div');
             card.className = 'paper-card';
 
+            var esc = self._escapeHtml;
             var abstractHtml = paper.abstract ?
-                '<div class="paper-abstract">' + paper.abstract + '</div>' : '';
+                '<div class="paper-abstract">' + esc(paper.abstract) + '</div>' : '';
 
             var sciBadge = '';
             if (paper.is_sci || window.AutoStat.PubMedSearcher.isSciJournal(paper.journal)) {
@@ -1363,16 +1375,16 @@ window.AutoStat.App = {
 
             card.innerHTML =
                 '<div class="paper-title">' +
-                    '<a href="' + paper.pubmed_url + '" target="_blank">' + paper.title + '</a>' +
+                    '<a href="' + esc(paper.pubmed_url) + '" target="_blank" rel="noopener">' + esc(paper.title) + '</a>' +
                 '</div>' +
                 '<div class="paper-meta">' +
-                    paper.authors_display + ' | ' +
-                    sciBadge + paper.journal + ' (' + paper.year + ')' +
+                    esc(paper.authors_display) + ' | ' +
+                    sciBadge + esc(paper.journal) + ' (' + esc(paper.year) + ')' +
                 '</div>' +
                 abstractHtml;
 
-            card.addEventListener('click', function(e) {
-                if (e.target.tagName !== 'A') {
+            self._bindActivate(card, function(e) {
+                if (!e || !e.target || e.target.tagName !== 'A') {
                     this.classList.toggle('expanded');
                 }
             });
@@ -1382,6 +1394,31 @@ window.AutoStat.App = {
     },
 
     // ==================== 유틸리티 (기존 유지) ====================
+
+    // HTML 특수문자 이스케이프 (innerHTML 삽입 전 XSS/렌더링 깨짐 방지)
+    _escapeHtml: function(text) {
+        if (text === undefined || text === null) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    // 클릭 가능한 요소에 키보드 접근성(Enter/Space) + ARIA role 부여
+    _bindActivate: function(elem, handler) {
+        if (!elem) return;
+        if (!elem.hasAttribute('role')) elem.setAttribute('role', 'button');
+        if (!elem.hasAttribute('tabindex')) elem.setAttribute('tabindex', '0');
+        elem.addEventListener('click', handler);
+        elem.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                handler.call(this, e);
+            }
+        });
+    },
 
     _showToast: function(message, type) {
         var existing = document.querySelector('.toast');

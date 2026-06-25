@@ -1862,3 +1862,28 @@ footer {
         text-align: center;
     }
 }
+
+/* ============================================
+   키보드 접근성 — 클릭 가능한 카드 포커스 표시
+   ============================================ */
+
+.entry-mode-card:focus-visible,
+.option-card:focus-visible,
+.mode-card:focus-visible,
+.browse-test-card:focus-visible,
+.alt-card:focus-visible,
+.paper-card:focus-visible {
+    outline: 2px solid #111;
+    outline-offset: 2px;
+}
+
+/* focus-visible 미지원 브라우저 폴백 */
+.entry-mode-card:focus,
+.option-card:focus,
+.mode-card:focus,
+.browse-test-card:focus,
+.alt-card:focus,
+.paper-card:focus {
+    outline: 2px solid #111;
+    outline-offset: 2px;
+}
