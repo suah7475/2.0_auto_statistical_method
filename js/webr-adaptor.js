@@ -52,6 +52,10 @@ window.AutoStat.WebRAdaptor = {
             return { steps: [], packages: [], rawCode: '' };
         }
 
+        if (window.AutoStat.RCodeCustomizer && window.AutoStat.RCodeCustomizer._assertSafeParams) {
+            window.AutoStat.RCodeCustomizer._assertSafeParams(params);
+        }
+
         // RCodeCustomizer에 _bt, _dfVar, _formula 등 헬퍼가 정의되어 있음
         var context = window.AutoStat.RCodeCustomizer || window.AutoStat.RCodeGenerators;
         var rawCode = generator.call(context, params);
@@ -146,7 +150,7 @@ window.AutoStat.WebRAdaptor = {
         var vfsPath = this.VFS_DATA_PATH;
         // na.strings: 빈 셀("") 및 "NA" 문자열을 R의 NA로 변환 → 숫자 컬럼이 character로 읽히는 문제 방지
         // 원본 코드에는 na.strings가 없으므로 [^)]* 정규식이 안전하게 동작함
-        var cleanCall = 'read.csv("' + vfsPath + '", header = TRUE, fileEncoding = "UTF-8", na.strings = c("", "NA"))';
+        var cleanCall = 'read.csv("' + vfsPath + '", header = TRUE, fileEncoding = "UTF-8", na.strings = c("", "NA"), check.names = FALSE)';
 
         rCode = rCode.replace(/read\.csv\([^)]*\)/g, cleanCall);
         rCode = rCode.replace(/read_excel\([^)]*\)/g, cleanCall);
@@ -166,7 +170,7 @@ window.AutoStat.WebRAdaptor = {
         var vfsPath = this.VFS_DATA_PATH;
         rCode = rCode.replace(
             /read_excel\([^)]*\)/g,
-            'read.csv("' + vfsPath + '", header = TRUE, fileEncoding = "UTF-8")'
+            'read.csv("' + vfsPath + '", header = TRUE, fileEncoding = "UTF-8", na.strings = c("", "NA"), check.names = FALSE)'
         );
 
         return rCode;
@@ -206,7 +210,8 @@ window.AutoStat.WebRAdaptor = {
         usedCols.forEach(function(col) {
             var type = colTypes[col];
             if (!type) return;
-            var bt = '`' + col + '`';
+            var bt = window.AutoStat.RCodeCustomizer && window.AutoStat.RCodeCustomizer._bt ?
+                window.AutoStat.RCodeCustomizer._bt(col) : '`' + col.replace(/`/g, '\\`') + '`';
             if (type === 'continuous') {
                 lines.push('if (!is.numeric(df$' + bt + ')) df$' + bt + ' <- suppressWarnings(as.numeric(as.character(df$' + bt + ')))');
             } else if (type === 'categorical') {

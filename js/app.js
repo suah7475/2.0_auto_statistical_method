@@ -11,13 +11,18 @@ window.AutoStat.App = {
     webrMode: false,
     uploadedFile: null,
     uploadedHeaders: [],
+    uploadedRows: [],
     uploadedCSV: '',
     uploadedRowCount: 0,
+    fileReadId: 0,
     webrColumnTypes: {},
     webrVariableMapping: {},
     webrMultiIVSelections: [],
     webrExtraValues: {},
     webrCancelled: false,  // WebR 분석 진행 중 취소 플래그
+    webrRunId: 0,
+    lastWebRProgress: 0,
+    paperSearchId: 0,
 
     // 진입 모드: 'flow' | 'browse'
     entryMode: null,
@@ -34,7 +39,7 @@ window.AutoStat.App = {
 
     init: function() {
         this.visibleQuestions = this._computeVisibleQuestions();
-        this._showModeSelection();
+        this._showModeSelection(false);
         this._setupEventListeners();
     },
 
@@ -67,7 +72,7 @@ window.AutoStat.App = {
         });
 
         document.getElementById('btn-restart').addEventListener('click', function() {
-            self._restart();
+            self._showModeSelection();
         });
 
         document.getElementById('btn-restart-bottom').addEventListener('click', function() {
@@ -135,7 +140,7 @@ window.AutoStat.App = {
         var btnCancelLoading = document.getElementById('btn-cancel-loading');
         if (btnCancelLoading) {
             btnCancelLoading.addEventListener('click', function() {
-                self.webrCancelled = true;  // 진행 중인 분석 흐름 중단
+                self._cancelActiveWebRRun();
                 self._fallbackToCodeMode();
             });
         }
@@ -148,21 +153,7 @@ window.AutoStat.App = {
         return window.AutoStat.QUESTIONS.filter(function(q) {
             if (!q.condition) return true;
             try {
-                var fn = new Function(
-                    'dv_type', 'dv_level', 'iv_count', 'iv_types',
-                    'group_count', 'paired', 'normality', 'has_covariate',
-                    'return (' + q.condition + ')'
-                );
-                return fn(
-                    self.answers.dv_type,
-                    self.answers.dv_level,
-                    self.answers.iv_count,
-                    self.answers.iv_types || [],
-                    self.answers.group_count,
-                    self.answers.paired,
-                    self.answers.normality,
-                    self.answers.has_covariate
-                );
+                return q.condition(self.answers);
             } catch (e) {
                 return false;
             }
@@ -179,17 +170,19 @@ window.AutoStat.App = {
         var container = document.getElementById('question-container');
 
         // 진행률
-        var progress = ((this.currentStep) / this.visibleQuestions.length) * 100;
+        var progress = ((this.currentStep + 1) / this.visibleQuestions.length) * 100;
         document.getElementById('progress-fill').style.width = progress + '%';
+        document.getElementById('progress-bar').setAttribute('aria-valuenow', String(Math.round(progress)));
         document.getElementById('progress-text').textContent =
             '단계 ' + (this.currentStep + 1) + ' / ' + this.visibleQuestions.length;
 
         // 질문 렌더링
         var html = '';
-        html += '<div class="question-help">' + this._stripEmoji(q.help) + '</div>';
-        html += '<h2 class="question-title">' + q.question + '</h2>';
+        html += '<div class="question-help">' + this._escapeHtml(this._stripEmoji(q.help)) + '</div>';
+        html += '<h2 class="question-title" tabindex="-1">' + this._escapeHtml(q.question) + '</h2>';
 
-        if (q.multiSelect) {
+        var allowMulti = q.multiSelect && !(q.id === 'iv_types' && Number(this.answers.iv_count) === 1);
+        if (allowMulti) {
             html += '<div class="multi-select-hint">해당하는 것을 모두 선택하세요</div>';
         }
 
@@ -206,18 +199,21 @@ window.AutoStat.App = {
                 isSelected = currentAnswer === opt.value;
             }
 
-            html += '<div class="option-card' + (isSelected ? ' selected' : '') + '" ' +
+            html += '<button type="button" class="option-card' + (isSelected ? ' selected' : '') + '" ' +
+                     'aria-pressed="' + (isSelected ? 'true' : 'false') + '" ' +
                      'data-question="' + q.id + '" ' +
                      'data-value="' + this._encodeValue(opt.value) + '" ' +
-                     'data-multi="' + (q.multiSelect ? 'true' : 'false') + '">';
-            html += '<div class="option-label">' + this._stripEmoji(opt.label) + '</div>';
-            html += '<div class="option-desc">' + opt.description + '</div>';
-            html += '</div>';
+                     'data-answer-array="' + (q.id === 'iv_types' ? 'true' : 'false') + '" ' +
+                     'data-multi="' + (allowMulti ? 'true' : 'false') + '">';
+            html += '<span class="option-label">' + this._escapeHtml(this._stripEmoji(opt.label)) + '</span>';
+            html += '<span class="option-desc">' + this._escapeHtml(opt.description) + '</span>';
+            html += '</button>';
         }
         html += '</div>';
 
-        if (q.multiSelect) {
-            html += '<button class="btn btn-primary btn-confirm" id="btn-confirm-multi">선택 완료</button>';
+        if (allowMulti) {
+            var hasSelection = Array.isArray(currentAnswer) && currentAnswer.length > 0;
+            html += '<button class="btn btn-primary btn-confirm" id="btn-confirm-multi"' + (hasSelection ? '' : ' disabled') + '>선택 완료</button>';
         }
 
         container.innerHTML = html;
@@ -226,7 +222,7 @@ window.AutoStat.App = {
         var self = this;
         var cards = container.querySelectorAll('.option-card');
         cards.forEach(function(card) {
-            self._bindActivate(card, function() {
+            card.addEventListener('click', function() {
                 var qId = this.getAttribute('data-question');
                 var val = self._decodeValue(this.getAttribute('data-value'));
                 var isMulti = this.getAttribute('data-multi') === 'true';
@@ -234,7 +230,7 @@ window.AutoStat.App = {
                 if (isMulti) {
                     self._handleMultiSelect(qId, val, this);
                 } else {
-                    self._handleAnswer(qId, val);
+                    self._handleAnswer(qId, this.getAttribute('data-answer-array') === 'true' ? [val] : val);
                 }
             });
         });
@@ -259,6 +255,8 @@ window.AutoStat.App = {
         // 결과 섹션 숨기기
         document.getElementById('result-section').style.display = 'none';
         document.getElementById('question-section').style.display = 'block';
+        var title = container.querySelector('.question-title');
+        if (title) title.focus({ preventScroll: true });
     },
 
     _encodeValue: function(val) {
@@ -283,10 +281,14 @@ window.AutoStat.App = {
         if (idx !== -1) {
             this.answers[questionId].splice(idx, 1);
             cardElem.classList.remove('selected');
+            cardElem.setAttribute('aria-pressed', 'false');
         } else {
             this.answers[questionId].push(value);
             cardElem.classList.add('selected');
+            cardElem.setAttribute('aria-pressed', 'true');
         }
+        var confirmBtn = document.getElementById('btn-confirm-multi');
+        if (confirmBtn) confirmBtn.disabled = this.answers[questionId].length === 0;
     },
 
     _handleAnswer: function(questionId, value) {
@@ -326,26 +328,32 @@ window.AutoStat.App = {
         if (this.currentStep > 0) {
             this.currentStep--;
             this.visibleQuestions = this._computeVisibleQuestions();
-            var q = this.visibleQuestions[this.currentStep];
-            if (q) delete this.answers[q.id];
             this._renderQuestion();
         }
     },
 
     _restart: function() {
+        this.webrCancelled = true;
+        if (window.AutoStat.WebRRunner && window.AutoStat.WebRRunner.cancel) {
+            window.AutoStat.WebRRunner.cancel();
+        }
         this.currentStep = 0;
         this.answers = {};
         this.currentRecommendation = null;
         this.webrMode = false;
         this.uploadedFile = null;
         this.uploadedHeaders = [];
+        this.uploadedRows = [];
         this.uploadedCSV = '';
         this.uploadedRowCount = 0;
+        this.fileReadId++;
         this.webrColumnTypes = {};
         this.webrVariableMapping = {};
         this.webrMultiIVSelections = [];
         this.webrExtraValues = {};
         this.visibleQuestions = this._computeVisibleQuestions();
+        this.webrRunId++;
+        this.lastWebRProgress = 0;
 
         // WebR 관련 UI 초기화
         this._hideAllWebrSections();
@@ -353,17 +361,24 @@ window.AutoStat.App = {
         if (fileInput) fileInput.value = '';
         document.getElementById('file-dropzone').style.display = 'block';
         document.getElementById('file-preview').style.display = 'none';
+        this._hideValidationSummary();
+        this._clearPaperResults();
+        document.querySelectorAll('.mode-card').forEach(function(card) {
+            card.classList.remove('selected');
+            card.setAttribute('aria-pressed', 'false');
+        });
     },
 
     // ==================== 진입 모드 선택 ====================
 
-    _showModeSelection: function() {
+    _showModeSelection: function(shouldFocus) {
         this._restart();
         document.getElementById('entry-mode-section').style.display = 'block';
         document.getElementById('browse-section').style.display = 'none';
         document.getElementById('question-section').style.display = 'none';
         document.getElementById('result-section').style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (shouldFocus !== false) this._focusHeading('#entry-title');
     },
 
     _startFlowMode: function() {
@@ -398,11 +413,11 @@ window.AutoStat.App = {
             cat.tests.forEach(function(testId) {
                 var test = window.AutoStat.STAT_TESTS[testId];
                 if (!test) return;
-                html += '<div class="browse-test-card" data-testid="' + testId + '">';
+                html += '<button type="button" class="browse-test-card" data-testid="' + testId + '">';
                 html += '<div class="browse-test-name">' + test.name + '</div>';
                 html += '<div class="browse-test-name-en">' + test.name_en + '</div>';
                 html += '<div class="browse-test-desc">' + test.simple_description + '</div>';
-                html += '</div>';
+                html += '</button>';
             });
 
             html += '</div></div>';
@@ -432,6 +447,7 @@ window.AutoStat.App = {
 
         // 의사결정 경로 숨김 (목록 선택 시 불필요)
         document.getElementById('decision-path-container').style.display = 'none';
+        this._clearPaperResults();
 
         // 결과 렌더링
         document.getElementById('result-title').textContent = test.name;
@@ -470,6 +486,7 @@ window.AutoStat.App = {
         this._populateTherapyFields();
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        this._focusHeading('#result-title');
     },
 
     // ==================== 결과 표시 (기존 유지) ====================
@@ -481,6 +498,12 @@ window.AutoStat.App = {
         document.getElementById('progress-fill').style.width = '100%';
 
         var result = window.AutoStat.StatRecommender.recommend(this.answers);
+        if (!result.success || !result.recommendation || !result.recommendation.primary) {
+            this._showToast(result.message || '추천 결과를 만들 수 없습니다. 선택 내용을 다시 확인해주세요.', 'error');
+            this.currentStep = Math.max(0, this.visibleQuestions.length - 1);
+            this._renderQuestion();
+            return;
+        }
         this.currentRecommendation = result.recommendation;
 
         var primary = result.recommendation.primary;
@@ -512,8 +535,10 @@ window.AutoStat.App = {
 
         // 의사결정 경로 다시 표시 (단계별 흐름에서 왔을 때)
         document.getElementById('decision-path-container').style.display = 'block';
+        document.getElementById('decision-path-container').open = false;
         this._renderDecisionPath(result.recommendation.decision_path);
         this._renderAlternatives(result.recommendation.alternatives);
+        this._clearPaperResults();
 
         // [NEW] 모드 선택 표시, 기존 커스터마이저 숨김
         document.getElementById('analysis-mode-section').style.display = 'block';
@@ -524,6 +549,7 @@ window.AutoStat.App = {
         this._populateTherapyFields();
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        this._focusHeading('#result-title');
     },
 
     _renderDecisionPath: function(path) {
@@ -555,12 +581,13 @@ window.AutoStat.App = {
         var self = this;
 
         alternatives.forEach(function(alt) {
-            var card = document.createElement('div');
+            var card = document.createElement('button');
+            card.type = 'button';
             card.className = 'alt-card';
             card.innerHTML =
-                '<div class="alt-name">' + alt.name + '</div>' +
-                '<div class="alt-reason">' + self._stripEmoji(alt.reason || '') + '</div>' +
-                '<div class="alt-desc">' + alt.simple_description + '</div>';
+                '<span class="alt-name">' + self._escapeHtml(alt.name) + '</span>' +
+                '<span class="alt-reason">' + self._escapeHtml(self._stripEmoji(alt.reason || '')) + '</span>' +
+                '<span class="alt-desc">' + self._escapeHtml(alt.simple_description) + '</span>';
 
             self._bindActivate(card, function() {
                 self._switchToTest(alt.id);
@@ -589,6 +616,7 @@ window.AutoStat.App = {
 
         this.currentRecommendation.primary = newTest;
         this.currentRecommendation.alternatives = newAlts;
+        this._clearPaperResults();
 
         document.getElementById('result-title').textContent = newTest.name;
         document.getElementById('result-name-en').textContent = newTest.name_en;
@@ -623,22 +651,28 @@ window.AutoStat.App = {
         this._hideAllWebrSections();
 
         window.scrollTo({ top: document.getElementById('primary-result').offsetTop - 20, behavior: 'smooth' });
+        this._focusHeading('#result-title');
     },
 
     // ==================== [NEW] 모드 선택 ====================
 
     _selectMode: function(mode) {
         // 카드 선택 표시
-        document.querySelectorAll('.mode-card').forEach(function(c) { c.classList.remove('selected'); });
+        document.querySelectorAll('.mode-card').forEach(function(c) {
+            c.classList.remove('selected');
+            c.setAttribute('aria-pressed', 'false');
+        });
 
         if (mode === 'webr') {
             this.webrMode = true;
             document.getElementById('mode-webr').classList.add('selected');
+            document.getElementById('mode-webr').setAttribute('aria-pressed', 'true');
             document.getElementById('r-code-customizer').style.display = 'none';
             document.getElementById('file-upload-section').style.display = 'block';
         } else {
             this.webrMode = false;
             document.getElementById('mode-code').classList.add('selected');
+            document.getElementById('mode-code').setAttribute('aria-pressed', 'true');
             document.getElementById('file-upload-section').style.display = 'none';
             document.getElementById('r-code-customizer').style.display = 'block';
 
@@ -659,8 +693,28 @@ window.AutoStat.App = {
 
     // ==================== [NEW] 파일 업로드 ====================
 
+    _decodeCsvBuffer: function(buffer) {
+        if (typeof TextDecoder === 'undefined') {
+            throw new Error('이 브라우저는 CSV 문자 인코딩 처리를 지원하지 않습니다. Excel(.xlsx) 파일을 사용해주세요.');
+        }
+
+        var bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        var text;
+        try {
+            text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        } catch (utf8Error) {
+            try {
+                text = new TextDecoder('euc-kr', { fatal: true }).decode(bytes);
+            } catch (eucKrError) {
+                throw new Error('CSV 문자 인코딩을 확인할 수 없습니다. UTF-8 또는 EUC-KR로 저장해주세요.');
+            }
+        }
+        return text.replace(/^\uFEFF/, '');
+    },
+
     _handleFileUpload: function(file) {
         var self = this;
+        var readId = ++this.fileReadId;
 
         // 파일 크기 체크 (10MB)
         if (file.size > 10 * 1024 * 1024) {
@@ -675,37 +729,70 @@ window.AutoStat.App = {
             return;
         }
 
-        this.uploadedFile = file;
+        if (typeof XLSX === 'undefined') {
+            this._showToast('파일 읽기 도구를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', 'error');
+            return;
+        }
+
+        this.uploadedFile = null;
+        this.uploadedHeaders = [];
+        this.uploadedRows = [];
+        this.uploadedCSV = '';
+        this.uploadedRowCount = 0;
+        this._hideValidationSummary();
 
         var reader = new FileReader();
         reader.onload = function(e) {
+            if (readId !== self.fileReadId) return;
             try {
-                var data = new Uint8Array(e.target.result);
-                var workbook = XLSX.read(data, { type: 'array' });
+                var workbook;
+                if (ext === 'csv') {
+                    var csvText = self._decodeCsvBuffer(e.target.result);
+                    workbook = XLSX.read(csvText, { type: 'string', cellDates: false });
+                } else {
+                    var data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, { type: 'array', cellDates: false });
+                }
                 var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
 
                 // JSON 배열로 변환
-                var jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                var jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: true, defval: '' });
                 if (jsonData.length < 2) {
                     self._showToast('데이터가 비어있거나 헤더만 있습니다.', 'error');
                     return;
                 }
 
                 var headers = jsonData[0].map(function(h) { return String(h).trim(); });
-                var rows = jsonData.slice(1);
+                var rows = jsonData.slice(1).filter(function(row) {
+                    return row.some(function(value) {
+                        return !window.AutoStat.DataValidator.isMissing(value);
+                    });
+                });
+                var headerReport = window.AutoStat.DataValidator.validateHeaders(headers);
+                if (!headerReport.valid) {
+                    self._showToast(headerReport.errors[0], 'error');
+                    return;
+                }
+                if (rows.length === 0) {
+                    self._showToast('열 이름 아래에 분석할 데이터가 없습니다.', 'error');
+                    return;
+                }
 
-                // CSV 문자열 변환 (WebR VFS용)
-                var csvString = XLSX.utils.sheet_to_csv(firstSheet);
+                // 검증한 헤더와 빈 행을 정리한 데이터만 WebR에 전달
+                var cleanSheet = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+                var csvString = XLSX.utils.sheet_to_csv(cleanSheet);
 
+                self.uploadedFile = file;
                 self.uploadedHeaders = headers;
+                self.uploadedRows = rows;
                 self.uploadedCSV = csvString;
                 self.uploadedRowCount = rows.length;
 
                 // 미리보기 표시
                 self._showDataPreview(headers, rows.slice(0, 5), file.name);
 
-                // 컬럼 타입 자동 감지
-                self.webrColumnTypes = window.AutoStat.TypeDetector.detectMultiple(headers);
+                // 열 이름과 실제 값을 함께 사용해 유형 감지
+                self.webrColumnTypes = window.AutoStat.DataValidator.detectTypes(headers, rows);
 
                 // 변수 매핑 UI 표시
                 self._showWebrVariableMapping();
@@ -713,6 +800,10 @@ window.AutoStat.App = {
             } catch (err) {
                 self._showToast('파일을 읽을 수 없습니다: ' + err.message, 'error');
             }
+        };
+        reader.onerror = function() {
+            if (readId !== self.fileReadId) return;
+            self._showToast('파일을 읽지 못했습니다. 파일을 다시 선택해주세요.', 'error');
         };
         reader.readAsArrayBuffer(file);
     },
@@ -725,25 +816,38 @@ window.AutoStat.App = {
 
         // 미리보기 테이블
         var table = document.getElementById('file-preview-table');
-        var html = '<thead><tr>';
-        headers.forEach(function(h) {
-            html += '<th>' + h + '</th>';
+        table.replaceChildren();
+        var thead = document.createElement('thead');
+        var headerRow = document.createElement('tr');
+        headers.forEach(function(header) {
+            var th = document.createElement('th');
+            th.scope = 'col';
+            th.textContent = header;
+            headerRow.appendChild(th);
         });
-        html += '</tr></thead><tbody>';
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
 
+        var tbody = document.createElement('tbody');
         sampleRows.forEach(function(row) {
-            html += '<tr>';
+            var tr = document.createElement('tr');
             for (var i = 0; i < headers.length; i++) {
-                html += '<td>' + (row[i] !== undefined ? row[i] : '') + '</td>';
+                var td = document.createElement('td');
+                td.textContent = row[i] !== undefined ? String(row[i]) : '';
+                tr.appendChild(td);
             }
-            html += '</tr>';
+            tbody.appendChild(tr);
         });
         if (this.uploadedRowCount > 5) {
-            html += '<tr><td colspan="' + headers.length + '" style="text-align:center;color:#999;">... 외 ' +
-                    (this.uploadedRowCount - 5) + '행</td></tr>';
+            var moreRow = document.createElement('tr');
+            var moreCell = document.createElement('td');
+            moreCell.colSpan = headers.length;
+            moreCell.className = 'preview-more';
+            moreCell.textContent = '그 외 ' + (this.uploadedRowCount - 5) + '개 행';
+            moreRow.appendChild(moreCell);
+            tbody.appendChild(moreRow);
         }
-        html += '</tbody>';
-        table.innerHTML = html;
+        table.appendChild(tbody);
 
         // 드롭존 숨기고 미리보기 표시
         document.getElementById('file-dropzone').style.display = 'none';
@@ -759,123 +863,320 @@ window.AutoStat.App = {
         if (!requirements) return;
 
         var mappingDiv = document.getElementById('webr-variable-mapping');
-        var html = '<h4>분석 변수 매핑</h4>';
-        html += '<p class="help-text">통계 분석에 필요한 변수를 선택하세요. 유형이 잘못 감지된 경우 직접 수정하세요.</p>';
-
+        mappingDiv.replaceChildren();
         var headers = this.uploadedHeaders;
         var colTypes = this.webrColumnTypes || {};
+        var self = this;
+        var controlIndex = 0;
 
-        // 유형 선택 드롭다운 HTML 생성 헬퍼
-        function typeSelectHtml(attrName, attrVal, detectedType) {
-            var opts = [
-                ['', '유형'],
-                ['continuous', '연속형'],
-                ['categorical', '범주형'],
+        function appendTextElement(tag, className, text, parent) {
+            var element = document.createElement(tag);
+            if (className) element.className = className;
+            element.textContent = text;
+            parent.appendChild(element);
+            return element;
+        }
+
+        appendTextElement('h4', '', '분석에 사용할 열 연결', mappingDiv);
+        appendTextElement('p', 'help-text', '각 역할에 맞는 열을 고르고 자동 감지된 유형을 확인하세요.', mappingDiv);
+        if (requirements.note) appendTextElement('div', 'mapping-note', requirements.note, mappingDiv);
+
+        function buildTypeSelect(attribute, value, detectedType, label) {
+            var select = document.createElement('select');
+            select.className = 'type-select';
+            select.setAttribute(attribute, value);
+            select.setAttribute('aria-label', label + ' 데이터 유형');
+            [
+                ['', '유형 선택'],
+                ['continuous', '숫자'],
+                ['categorical', '그룹'],
                 ['ordinal', '순서형']
-            ];
-            var html = '<select class="type-select" ' + attrName + '="' + attrVal + '">';
-            opts.forEach(function(o) {
-                var sel = (detectedType === o[0]) ? ' selected' : '';
-                html += '<option value="' + o[0] + '"' + sel + '>' + o[1] + '</option>';
+            ].forEach(function(optionData) {
+                var option = document.createElement('option');
+                option.value = optionData[0];
+                option.textContent = optionData[1];
+                option.selected = detectedType === optionData[0];
+                select.appendChild(option);
             });
-            return html + '</select>';
+            return select;
         }
 
-        // 필수 변수
-        if (requirements.variables) {
-            requirements.variables.forEach(function(v) {
-                html += '<div class="mapping-group">';
-                html += '<label class="mapping-label">' + v.label + ' *</label>';
-                if (v.help) html += '<span class="mapping-help">' + v.help + '</span>';
-                html += '<div class="mapping-row">';
-                html += '<select class="mapping-select" data-role="' + v.role + '">';
-                html += '<option value="">-- 선택 --</option>';
-                headers.forEach(function(h) {
-                    html += '<option value="' + h + '">' + h + '</option>';
-                });
-                html += '</select>';
-                html += typeSelectHtml('data-type-role', v.role, '');
-                html += '</div></div>';
+        function appendColumnOptions(select, preferredType, optional) {
+            var emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = optional ? '선택하지 않음' : '열을 선택하세요';
+            select.appendChild(emptyOption);
+
+            headers.slice().sort(function(a, b) {
+                var aMatch = colTypes[a] === preferredType ? 0 : 1;
+                var bMatch = colTypes[b] === preferredType ? 0 : 1;
+                return aMatch - bMatch;
+            }).forEach(function(header) {
+                var option = document.createElement('option');
+                var typeLabel = colTypes[header] === 'continuous' ? '숫자' :
+                    (colTypes[header] === 'ordinal' ? '순서형' : '그룹');
+                option.value = header;
+                option.textContent = header + ' (' + typeLabel + ')';
+                select.appendChild(option);
             });
         }
 
-        // 다중 IV (체크박스) - 각 항목에 유형 선택 추가
+        function appendVariableControl(variable, optional) {
+            controlIndex++;
+            var group = document.createElement('div');
+            group.className = optional ? 'mapping-group mapping-optional' : 'mapping-group';
+            var selectId = 'webr-map-' + controlIndex;
+            var label = appendTextElement('label', 'mapping-label', variable.label + (variable.required ? ' *' : ''), group);
+            label.htmlFor = selectId;
+            if (variable.help) appendTextElement('span', 'mapping-help', variable.help, group);
+
+            var row = document.createElement('div');
+            row.className = 'mapping-row';
+            var select = document.createElement('select');
+            select.id = selectId;
+            select.className = 'mapping-select';
+            select.setAttribute('data-role', variable.role);
+            appendColumnOptions(select, variable.type, optional);
+            row.appendChild(select);
+            row.appendChild(buildTypeSelect('data-type-role', variable.role, '', variable.label));
+            group.appendChild(row);
+            mappingDiv.appendChild(group);
+        }
+
+        (requirements.variables || []).forEach(function(variable) {
+            appendVariableControl(variable, false);
+        });
+        if (requirements.optionalVariables && requirements.optionalVariables.length > 0) {
+            appendTextElement('div', 'mapping-optional-header', '선택 사항', mappingDiv);
+            requirements.optionalVariables.forEach(function(variable) {
+                appendVariableControl(variable, true);
+            });
+        }
+
         if (requirements.multiIV) {
-            html += '<div class="mapping-group">';
-            html += '<label class="mapping-label">' + (requirements.multiIVLabel || '독립변수') + '</label>';
-            if (requirements.multiIVHelp) html += '<span class="mapping-help">' + requirements.multiIVHelp + '</span>';
-            html += '<div class="mapping-checkboxes" id="webr-multi-iv">';
-            headers.forEach(function(h) {
-                var detected = colTypes[h] || '';
-                html += '<div class="checkbox-item">';
-                html += '<input type="checkbox" value="' + h + '" id="webr-iv-' + h + '">';
-                html += '<label for="webr-iv-' + h + '">' + h + '</label>';
-                html += typeSelectHtml('data-type-iv', h, detected);
-                html += '</div>';
+            var fieldset = document.createElement('fieldset');
+            fieldset.className = 'mapping-group';
+            var legend = document.createElement('legend');
+            legend.className = 'mapping-label';
+            legend.textContent = requirements.multiIVLabel || '독립변수';
+            fieldset.appendChild(legend);
+            if (requirements.multiIVHelp) appendTextElement('span', 'mapping-help', requirements.multiIVHelp, fieldset);
+
+            var checkboxes = document.createElement('div');
+            checkboxes.className = 'mapping-checkboxes';
+            checkboxes.id = 'webr-multi-iv';
+            headers.forEach(function(header, index) {
+                var item = document.createElement('div');
+                item.className = 'checkbox-item';
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = header;
+                checkbox.id = 'webr-iv-' + index;
+                var checkboxLabel = document.createElement('label');
+                checkboxLabel.htmlFor = checkbox.id;
+                checkboxLabel.textContent = header;
+                item.appendChild(checkbox);
+                item.appendChild(checkboxLabel);
+                item.appendChild(buildTypeSelect('data-type-iv', header, colTypes[header] || '', header));
+                checkboxes.appendChild(item);
             });
-            html += '</div></div>';
+            fieldset.appendChild(checkboxes);
+            mappingDiv.appendChild(fieldset);
         }
 
-        // 선택적 변수
-        if (requirements.optionalVariables) {
-            html += '<div class="mapping-optional-header">선택 사항</div>';
-            requirements.optionalVariables.forEach(function(v) {
-                html += '<div class="mapping-group mapping-optional">';
-                html += '<label class="mapping-label">' + v.label + '</label>';
-                if (v.help) html += '<span class="mapping-help">' + v.help + '</span>';
-                html += '<div class="mapping-row">';
-                html += '<select class="mapping-select" data-role="' + v.role + '">';
-                html += '<option value="">-- 선택 안 함 --</option>';
-                headers.forEach(function(h) {
-                    html += '<option value="' + h + '">' + h + '</option>';
-                });
-                html += '</select>';
-                html += typeSelectHtml('data-type-role', v.role, '');
-                html += '</div></div>';
-            });
-        }
+        if (requirements.extras && requirements.extras.length > 0) {
+            appendTextElement('div', 'mapping-optional-header', '분석에 필요한 설정', mappingDiv);
+            requirements.extras.forEach(function(extra) {
+                controlIndex++;
+                var group = document.createElement('div');
+                group.className = 'mapping-group';
+                var inputId = 'webr-extra-' + controlIndex;
+                var label = appendTextElement('label', 'mapping-label', extra.label + (extra.required ? ' *' : ''), group);
+                label.htmlFor = inputId;
+                if (extra.help) appendTextElement('span', 'mapping-help', extra.help, group);
 
-        // 추가 옵션 (extras)
-        if (requirements.extras) {
-            requirements.extras.forEach(function(ext) {
-                html += '<div class="mapping-group mapping-optional">';
-                html += '<label class="mapping-label">' + ext.label + '</label>';
-                if (ext.help) html += '<span class="mapping-help">' + ext.help + '</span>';
-
-                if (ext.inputType === 'select' && ext.options) {
-                    html += '<select class="mapping-select" data-extra="' + ext.role + '">';
-                    ext.options.forEach(function(opt) {
-                        var sel = (opt === ext.defaultValue) ? ' selected' : '';
-                        html += '<option value="' + opt + '"' + sel + '>' + opt + '</option>';
-                    });
-                    html += '</select>';
-                } else if (ext.inputType === 'number') {
-                    html += '<input type="number" class="mapping-input" data-extra="' + ext.role + '" ' +
-                            'value="' + (ext.defaultValue || '') + '">';
+                var input;
+                if (extra.inputType === 'select' || extra.inputType === 'data-select') {
+                    input = document.createElement('select');
+                    input.className = 'mapping-select';
+                    if (extra.inputType === 'data-select') {
+                        input.disabled = true;
+                        input.setAttribute('data-source-role', extra.sourceRole);
+                        var pending = document.createElement('option');
+                        pending.value = '';
+                        pending.textContent = '먼저 결과 열을 선택하세요';
+                        input.appendChild(pending);
+                    } else {
+                        (extra.options || []).forEach(function(value) {
+                            var option = document.createElement('option');
+                            option.value = value;
+                            option.textContent = value;
+                            option.selected = value === extra.defaultValue;
+                            input.appendChild(option);
+                        });
+                    }
                 } else {
-                    html += '<input type="text" class="mapping-input" data-extra="' + ext.role + '" ' +
-                            'value="' + (ext.defaultValue || '') + '" placeholder="' + (ext.help || '') + '">';
+                    input = document.createElement('input');
+                    input.className = 'mapping-input';
+                    input.type = extra.inputType === 'number' ? 'number' : 'text';
+                    input.value = extra.defaultValue === undefined ? '' : extra.defaultValue;
+                    if (extra.min !== undefined) input.min = extra.min;
+                    if (extra.max !== undefined) input.max = extra.max;
+                    if (extra.step !== undefined) input.step = extra.step;
+                    if (extra.inputType === 'data-order') {
+                        input.disabled = true;
+                        input.placeholder = '낮은 단계 | 중간 단계 | 높은 단계';
+                        input.setAttribute('data-source-role', extra.sourceRole);
+                    }
                 }
-
-                html += '</div>';
+                input.id = inputId;
+                input.setAttribute('data-extra', extra.role);
+                input.setAttribute('data-extra-type', extra.inputType || 'text');
+                group.appendChild(input);
+                mappingDiv.appendChild(group);
             });
         }
 
-        mappingDiv.innerHTML = html;
         mappingDiv.style.display = 'block';
         document.getElementById('file-action-buttons').style.display = 'flex';
+        this._hideValidationSummary();
 
-        // 변수 선택 시 감지된 유형 자동 반영
-        var self = this;
-        mappingDiv.querySelectorAll('.mapping-select[data-role]').forEach(function(varSel) {
-            var role = varSel.getAttribute('data-role');
-            var typeSel = mappingDiv.querySelector('.type-select[data-type-role="' + role + '"]');
-            if (!typeSel) return;
-            varSel.addEventListener('change', function() {
-                var detected = (self.webrColumnTypes || {})[varSel.value] || '';
-                typeSel.value = detected;
+        mappingDiv.querySelectorAll('.mapping-select[data-role]').forEach(function(varSelect) {
+            varSelect.addEventListener('change', function() {
+                var role = varSelect.getAttribute('data-role');
+                var typeSelect = mappingDiv.querySelector('.type-select[data-type-role="' + role + '"]');
+                if (typeSelect) typeSelect.value = self.webrColumnTypes[varSelect.value] || '';
+                self._refreshDataDependentExtras();
+                self._hideValidationSummary();
             });
         });
+        mappingDiv.querySelectorAll('input, select').forEach(function(control) {
+            control.addEventListener('change', function() { self._hideValidationSummary(); });
+        });
+        this._refreshDataDependentExtras();
+    },
+
+    _refreshDataDependentExtras: function() {
+        var mappingDiv = document.getElementById('webr-variable-mapping');
+        var self = this;
+        mappingDiv.querySelectorAll('[data-extra-type="data-select"], [data-extra-type="data-order"]').forEach(function(control) {
+            var sourceRole = control.getAttribute('data-source-role');
+            var sourceSelect = mappingDiv.querySelector('.mapping-select[data-role="' + sourceRole + '"]');
+            var column = sourceSelect ? sourceSelect.value : '';
+            var values = column ? window.AutoStat.DataValidator.getUniqueColumnValues(
+                self.uploadedHeaders, self.uploadedRows, column
+            ) : [];
+
+            if (control.getAttribute('data-extra-type') === 'data-select') {
+                var previous = control.value;
+                control.replaceChildren();
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = column ? '범주를 선택하세요' : '먼저 결과 열을 선택하세요';
+                control.appendChild(placeholder);
+                values.forEach(function(value) {
+                    var option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    control.appendChild(option);
+                });
+                control.disabled = !column;
+                if (values.indexOf(previous) !== -1) control.value = previous;
+            } else {
+                control.disabled = !column;
+                control.value = values.join(' | ');
+            }
+        });
+    },
+
+    _collectWebrConfig: function() {
+        var root = document.getElementById('webr-variable-mapping');
+        var vars = {};
+        var multiIV = [];
+        var extras = {};
+        var columnTypes = Object.assign({}, this.webrColumnTypes);
+
+        root.querySelectorAll('.mapping-select[data-role]').forEach(function(select) {
+            if (select.value) vars[select.getAttribute('data-role')] = select.value;
+        });
+        root.querySelectorAll('#webr-multi-iv input[type="checkbox"]:checked').forEach(function(checkbox) {
+            multiIV.push(checkbox.value);
+        });
+        root.querySelectorAll('[data-extra]').forEach(function(control) {
+            extras[control.getAttribute('data-extra')] = control.value;
+        });
+        root.querySelectorAll('.type-select[data-type-role]').forEach(function(select) {
+            var role = select.getAttribute('data-type-role');
+            var variableSelect = root.querySelector('.mapping-select[data-role="' + role + '"]');
+            if (variableSelect && variableSelect.value && select.value) {
+                columnTypes[variableSelect.value] = select.value;
+            }
+        });
+        root.querySelectorAll('#webr-multi-iv .type-select[data-type-iv]').forEach(function(select) {
+            if (select.value) columnTypes[select.getAttribute('data-type-iv')] = select.value;
+        });
+
+        return { vars: vars, multiIV: multiIV, extras: extras, columnTypes: columnTypes };
+    },
+
+    _validateWebrConfig: function(config) {
+        var primary = this.currentRecommendation && this.currentRecommendation.primary;
+        var requirements = primary && window.AutoStat.TEST_VARIABLE_REQUIREMENTS[primary.id];
+        return window.AutoStat.DataValidator.validateMapping({
+            testId: primary ? primary.id : '',
+            requirements: requirements || {},
+            headers: this.uploadedHeaders,
+            rows: this.uploadedRows,
+            vars: config.vars,
+            multiIV: config.multiIV,
+            extras: config.extras,
+            columnTypes: config.columnTypes
+        });
+    },
+
+    _renderValidationSummary: function(report) {
+        var container = document.getElementById('webr-validation-summary');
+        container.replaceChildren();
+        container.className = 'validation-summary ' + (report.valid ? 'validation-ready' : 'validation-error');
+
+        var title = document.createElement('strong');
+        title.textContent = report.valid ?
+            '분석 준비 완료: ' + report.completeRows + '개 행 사용' :
+            '분석 전에 ' + report.errors.length + '가지를 확인해주세요.';
+        container.appendChild(title);
+
+        if (report.errors.length > 0) {
+            var errorList = document.createElement('ul');
+            report.errors.forEach(function(message) {
+                var item = document.createElement('li');
+                item.textContent = message;
+                errorList.appendChild(item);
+            });
+            container.appendChild(errorList);
+        }
+        if (report.warnings.length > 0) {
+            var warningTitle = document.createElement('p');
+            warningTitle.className = 'validation-warning-title';
+            warningTitle.textContent = '함께 확인할 내용';
+            container.appendChild(warningTitle);
+            var warningList = document.createElement('ul');
+            report.warnings.forEach(function(message) {
+                var item = document.createElement('li');
+                item.textContent = message;
+                warningList.appendChild(item);
+            });
+            container.appendChild(warningList);
+        }
+        container.style.display = 'block';
+    },
+
+    _hideValidationSummary: function() {
+        var container = document.getElementById('webr-validation-summary');
+        if (container) container.style.display = 'none';
+    },
+
+    _isActiveWebRRun: function(runId) {
+        return !this.webrCancelled && this.webrRunId === runId;
     },
 
     // ==================== [NEW] WebR 분석 실행 ====================
@@ -885,57 +1186,24 @@ window.AutoStat.App = {
         var primary = this.currentRecommendation && this.currentRecommendation.primary;
         if (!primary) return;
 
-        // 변수 매핑 수집
-        var vars = {};
-        document.querySelectorAll('#webr-variable-mapping .mapping-select[data-role]').forEach(function(sel) {
-            if (sel.value) vars[sel.getAttribute('data-role')] = sel.value;
-        });
-
-        // 다중 IV 수집
-        var multiIVList = [];
-        document.querySelectorAll('#webr-multi-iv input[type="checkbox"]:checked').forEach(function(cb) {
-            multiIVList.push(cb.value);
-        });
-
-        // extras 수집
-        var extras = {};
-        document.querySelectorAll('#webr-variable-mapping [data-extra]').forEach(function(el) {
-            extras[el.getAttribute('data-extra')] = el.value;
-        });
-
-        // 변수 유형 오버라이드 수집 (자동감지 + 사용자 수정 반영)
-        var columnTypes = Object.assign({}, this.webrColumnTypes);
-        // 단일 변수 유형 선택
-        document.querySelectorAll('#webr-variable-mapping .type-select[data-type-role]').forEach(function(sel) {
-            if (!sel.value) return;
-            var role = sel.getAttribute('data-type-role');
-            var varSel = document.querySelector('#webr-variable-mapping .mapping-select[data-role="' + role + '"]');
-            if (varSel && varSel.value) columnTypes[varSel.value] = sel.value;
-        });
-        // 다중 IV 체크박스별 유형 선택
-        document.querySelectorAll('#webr-multi-iv .type-select[data-type-iv]').forEach(function(sel) {
-            if (sel.value) columnTypes[sel.getAttribute('data-type-iv')] = sel.value;
-        });
-
-        // 필수 변수 검증
-        var requirements = window.AutoStat.TEST_VARIABLE_REQUIREMENTS[primary.id];
-        if (requirements && requirements.variables) {
-            for (var i = 0; i < requirements.variables.length; i++) {
-                var v = requirements.variables[i];
-                if (v.required && !vars[v.role]) {
-                    this._showToast(v.label + '을(를) 선택해주세요.', 'error');
-                    return;
-                }
-            }
-        }
-
-        if (requirements && requirements.multiIV && multiIVList.length === 0) {
-            this._showToast('독립변수를 하나 이상 선택해주세요.', 'error');
+        var config = this._collectWebrConfig();
+        var validation = this._validateWebrConfig(config);
+        this._renderValidationSummary(validation);
+        if (!validation.valid) {
+            this._showToast(validation.errors[0], 'error');
+            document.getElementById('webr-validation-summary').scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
 
+        var vars = config.vars;
+        var multiIVList = config.multiIV;
+        var extras = config.extras;
+        var columnTypes = config.columnTypes;
+
         // UI: 로딩 표시
-        this.webrCancelled = false;  // 새 분석 시작 시 취소 플래그 초기화
+        this.webrCancelled = false;
+        var runId = ++this.webrRunId;
+        this.lastWebRProgress = 0;
         document.getElementById('file-upload-section').style.display = 'none';
         document.getElementById('analysis-mode-section').style.display = 'none';
         document.getElementById('webr-loading-section').style.display = 'block';
@@ -944,17 +1212,17 @@ window.AutoStat.App = {
 
         var Runner = window.AutoStat.WebRRunner;
         var Adaptor = window.AutoStat.WebRAdaptor;
-        var Renderer = window.AutoStat.ResultRenderer;
+        if (Runner.resetCancellation) Runner.resetCancellation();
 
         // 진행률 콜백
         Runner.onProgress = function(stage, pct, msg) {
-            self._updateWebRProgress(pct, msg);
+            if (self._isActiveWebRRun(runId)) self._updateWebRProgress(pct, msg);
         };
 
         var lastRunnerError = '';
         Runner.onError = function(msg) {
             lastRunnerError = msg;
-            self._showToast(msg, 'error');
+            if (self._isActiveWebRRun(runId)) self._showToast(msg, 'error');
         };
 
         // 결과 저장용 변수 (에러 시에도 부분 결과 표시)
@@ -966,7 +1234,7 @@ window.AutoStat.App = {
         try {
             // 1. WebR 초기화
             var initOk = await Runner.init();
-            if (this.webrCancelled) return;  // 로딩 중 취소됨
+            if (!this._isActiveWebRRun(runId)) return;
             if (!initOk) {
                 // 실제 에러 메시지를 표시
                 var detail = lastRunnerError || '알 수 없는 오류';
@@ -982,13 +1250,29 @@ window.AutoStat.App = {
 
             // 2. 필요 패키지 설치
             var requiredPkgs = Adaptor.getRequiredPackages(primary.id);
-            await Runner.ensurePackages(requiredPkgs);
-            if (this.webrCancelled) return;
+            var packagesOk = await Runner.ensurePackages(requiredPkgs);
+            if (!this._isActiveWebRRun(runId)) return;
+            if (!packagesOk) {
+                this._showResultViewerWithError(
+                    '분석 도구를 준비하지 못했습니다.',
+                    '필요한 R 패키지를 내려받지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해주세요.',
+                    primary.name
+                );
+                return;
+            }
 
             // 3. 데이터 파일을 VFS에 쓰기
             this._updateWebRProgress(50, '데이터 업로드 중...');
-            await Runner.writeFileToVFS('data.csv', this.uploadedCSV);
-            if (this.webrCancelled) return;
+            var writeOk = await Runner.writeFileToVFS('data.csv', this.uploadedCSV);
+            if (!this._isActiveWebRRun(runId)) return;
+            if (!writeOk) {
+                this._showResultViewerWithError(
+                    '데이터를 분석 환경에 전달하지 못했습니다.',
+                    '이전 데이터로 분석하지 않도록 실행을 중단했습니다. 파일을 다시 선택해주세요.',
+                    primary.name
+                );
+                return;
+            }
 
             // 4. R 코드 생성 (파라미터 이름 정확히 맞춤)
             this._updateWebRProgress(55, 'R 코드 준비 중...');
@@ -1030,13 +1314,14 @@ window.AutoStat.App = {
             // 6. 단계별 R 코드 실행 (패키지 목록 전달 → executeSteps가 JS API로 설치+로드 보장)
             this._updateWebRProgress(60, '분석 실행 중...');
             results = await Runner.executeSteps(separated.otherSteps, adapted.packages);
-            if (this.webrCancelled) return;
+            if (!this._isActiveWebRRun(runId)) return;
 
             // 7. 시각화 실행 (별도)
             if (separated.plotStep) {
                 this._updateWebRProgress(90, '시각화 생성 중...');
                 try {
                     plotImages = await Runner.captureGraphics(separated.plotStep.code);
+                    if (!this._isActiveWebRRun(runId)) return;
                     if (results) {
                         results.plot = { label: '시각화', output: '', error: null };
                     }
@@ -1054,9 +1339,10 @@ window.AutoStat.App = {
         }
 
         // 취소된 경우 결과 뷰어를 띄우지 않음 (코드 모드 화면 유지)
-        if (this.webrCancelled) return;
+        if (!this._isActiveWebRRun(runId)) return;
 
         // === 결과 뷰어 항상 표시 (부분 결과라도 보여줌) ===
+        this._updateWebRProgress(100, '분석 완료');
         this._showResultViewer(results, plotImages, rawCode, primary.name, errorMessages);
     },
 
@@ -1098,6 +1384,7 @@ window.AutoStat.App = {
 
         // 결과 섹션으로 스크롤
         document.getElementById('webr-result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        this._focusHeading('#webr-result-section h3');
     },
 
     // 에러 전용 결과 뷰어 표시
@@ -1121,6 +1408,7 @@ window.AutoStat.App = {
         this._createResultActionButtons(container, null, '', testName);
 
         document.getElementById('webr-result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        this._focusHeading('#webr-result-section h3');
     },
 
     // 결과 뷰어 액션 버튼 생성 + 이벤트 바인딩
@@ -1178,8 +1466,10 @@ window.AutoStat.App = {
             // 파일 업로드 상태 완전 초기화
             self.uploadedFile = null;
             self.uploadedHeaders = [];
+            self.uploadedRows = [];
             self.uploadedCSV = '';
             self.uploadedRowCount = 0;
+            self.fileReadId++;
             self.webrColumnTypes = {};
             self.webrVariableMapping = {};
             self.webrMultiIVSelections = [];
@@ -1200,6 +1490,7 @@ window.AutoStat.App = {
             if (varMapping) varMapping.style.display = 'none';
             var actionBtns = document.getElementById('file-action-buttons');
             if (actionBtns) actionBtns.style.display = 'none';
+            self._hideValidationSummary();
         });
         actions.appendChild(btnRerun);
 
@@ -1255,8 +1546,19 @@ window.AutoStat.App = {
     _updateWebRProgress: function(percent, message) {
         var fill = document.getElementById('webr-progress-fill');
         var text = document.getElementById('webr-progress-text');
-        if (fill) fill.style.width = percent + '%';
+        var normalized = Math.max(0, Math.min(100, Number(percent) || 0));
+        this.lastWebRProgress = Math.max(this.lastWebRProgress || 0, normalized);
+        if (fill) fill.style.width = this.lastWebRProgress + '%';
+        var progressBar = document.querySelector('.webr-progress-bar');
+        if (progressBar) progressBar.setAttribute('aria-valuenow', String(Math.round(this.lastWebRProgress)));
         if (text) text.textContent = message;
+    },
+
+    _cancelActiveWebRRun: function() {
+        this.webrCancelled = true;
+        this.webrRunId++;
+        var runner = window.AutoStat.WebRRunner;
+        if (runner && runner.cancel) runner.cancel();
     },
 
     _fallbackToCodeMode: function() {
@@ -1272,9 +1574,13 @@ window.AutoStat.App = {
     },
 
     _cancelWebR: function() {
+        this._cancelActiveWebRRun();
         document.getElementById('file-upload-section').style.display = 'none';
         document.getElementById('analysis-mode-section').style.display = 'block';
-        document.querySelectorAll('.mode-card').forEach(function(c) { c.classList.remove('selected'); });
+        document.querySelectorAll('.mode-card').forEach(function(c) {
+            c.classList.remove('selected');
+            c.setAttribute('aria-pressed', 'false');
+        });
 
         // 파일 업로드 완전 초기화
         document.getElementById('file-dropzone').style.display = 'block';
@@ -1283,12 +1589,15 @@ window.AutoStat.App = {
         if (fileInput) fileInput.value = '';
         this.uploadedFile = null;
         this.uploadedHeaders = [];
+        this.uploadedRows = [];
         this.uploadedCSV = '';
         this.uploadedRowCount = 0;
+        this.fileReadId++;
         this.webrColumnTypes = {};
         this.webrVariableMapping = {};
         this.webrMultiIVSelections = [];
         this.webrExtraValues = {};
+        this._hideValidationSummary();
     },
 
     _hideAllWebrSections: function() {
@@ -1316,6 +1625,7 @@ window.AutoStat.App = {
         if (!this.currentRecommendation || !this.currentRecommendation.primary) return;
 
         var testId = this.currentRecommendation.primary.id;
+        var searchId = ++this.paperSearchId;
         var field = document.getElementById('therapy-field-select').value;
         var sciFilter = document.getElementById('sci-filter-checkbox').checked;
 
@@ -1324,13 +1634,26 @@ window.AutoStat.App = {
 
         try {
             var result = await window.AutoStat.PubMedSearcher.search(testId, field, 10, sciFilter);
+            if (searchId !== this.paperSearchId || !this.currentRecommendation || this.currentRecommendation.primary.id !== testId) return;
+            if (!result.success) {
+                result.message = 'PubMed 검색에 연결하지 못했습니다. 잠시 후 다시 시도하거나 아래 링크를 이용해주세요.';
+            }
             this._renderPapers(result);
         } catch (e) {
+            if (searchId !== this.paperSearchId) return;
             var fallback = window.AutoStat.PubMedSearcher.getFallback(testId, field);
             this._renderPapers(fallback);
         } finally {
-            document.getElementById('papers-loading').style.display = 'none';
+            if (searchId === this.paperSearchId) document.getElementById('papers-loading').style.display = 'none';
         }
+    },
+
+    _clearPaperResults: function() {
+        this.paperSearchId++;
+        var loading = document.getElementById('papers-loading');
+        var list = document.getElementById('papers-list');
+        if (loading) loading.style.display = 'none';
+        if (list) list.replaceChildren();
     },
 
     _renderPapers: function(result) {
@@ -1341,53 +1664,75 @@ window.AutoStat.App = {
         if (result.sci_filtered) {
             var filterNote = document.createElement('div');
             filterNote.className = 'sci-filter-note';
-            filterNote.textContent = 'SCI-E급 저널 필터 적용됨';
+            filterNote.textContent = '주요 재활·의학 저널 목록을 적용했습니다.';
             container.appendChild(filterNote);
         }
 
         if (!result.papers || result.papers.length === 0) {
             var msg = result.message || '검색 결과가 없습니다.';
-            var html = '<div class="no-papers">';
-            html += '<p>' + self._escapeHtml(msg) + '</p>';
+            var empty = document.createElement('div');
+            empty.className = 'no-papers';
+            var message = document.createElement('p');
+            message.textContent = msg;
+            empty.appendChild(message);
             if (result.sci_filtered) {
-                html += '<p>SCI-E 필터를 해제하면 더 많은 결과를 볼 수 있습니다.</p>';
+                var hint = document.createElement('p');
+                hint.textContent = '저널 필터를 해제하면 더 많은 결과를 볼 수 있습니다.';
+                empty.appendChild(hint);
             }
             if (result.search_url) {
-                html += '<p><a href="' + self._escapeHtml(result.search_url) + '" target="_blank" rel="noopener">PubMed에서 직접 검색하기</a></p>';
+                var linkWrap = document.createElement('p');
+                var link = document.createElement('a');
+                link.href = result.search_url;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.textContent = 'PubMed에서 직접 검색';
+                linkWrap.appendChild(link);
+                empty.appendChild(linkWrap);
             }
-            html += '</div>';
-            container.innerHTML += html;
+            container.appendChild(empty);
             return;
         }
 
         result.papers.forEach(function(paper) {
-            var card = document.createElement('div');
+            var card = document.createElement('article');
             card.className = 'paper-card';
+            var title = document.createElement('h4');
+            title.className = 'paper-title';
+            var titleLink = document.createElement('a');
+            titleLink.href = paper.pubmed_url;
+            titleLink.target = '_blank';
+            titleLink.rel = 'noopener';
+            titleLink.textContent = paper.title;
+            title.appendChild(titleLink);
+            card.appendChild(title);
 
-            var esc = self._escapeHtml;
-            var abstractHtml = paper.abstract ?
-                '<div class="paper-abstract">' + esc(paper.abstract) + '</div>' : '';
-
-            var sciBadge = '';
+            var meta = document.createElement('div');
+            meta.className = 'paper-meta';
             if (paper.is_sci || window.AutoStat.PubMedSearcher.isSciJournal(paper.journal)) {
-                sciBadge = '<span class="sci-badge">SCI-E</span> ';
+                var badge = document.createElement('span');
+                badge.className = 'sci-badge';
+                badge.textContent = '주요 저널';
+                meta.appendChild(badge);
+                meta.appendChild(document.createTextNode(' '));
             }
+            meta.appendChild(document.createTextNode(
+                (paper.authors_display || '저자 정보 없음') + ' | ' +
+                (paper.journal || '저널 정보 없음') + (paper.year ? ' (' + paper.year + ')' : '')
+            ));
+            card.appendChild(meta);
 
-            card.innerHTML =
-                '<div class="paper-title">' +
-                    '<a href="' + esc(paper.pubmed_url) + '" target="_blank" rel="noopener">' + esc(paper.title) + '</a>' +
-                '</div>' +
-                '<div class="paper-meta">' +
-                    esc(paper.authors_display) + ' | ' +
-                    sciBadge + esc(paper.journal) + ' (' + esc(paper.year) + ')' +
-                '</div>' +
-                abstractHtml;
-
-            self._bindActivate(card, function(e) {
-                if (!e || !e.target || e.target.tagName !== 'A') {
-                    this.classList.toggle('expanded');
-                }
-            });
+            if (paper.abstract) {
+                var details = document.createElement('details');
+                details.className = 'paper-abstract';
+                var summary = document.createElement('summary');
+                summary.textContent = '초록 보기';
+                var abstract = document.createElement('p');
+                abstract.textContent = paper.abstract;
+                details.appendChild(summary);
+                details.appendChild(abstract);
+                card.appendChild(details);
+            }
 
             container.appendChild(card);
         });
@@ -1409,6 +1754,10 @@ window.AutoStat.App = {
     // 클릭 가능한 요소에 키보드 접근성(Enter/Space) + ARIA role 부여
     _bindActivate: function(elem, handler) {
         if (!elem) return;
+        if (elem.tagName === 'BUTTON' || elem.tagName === 'A') {
+            elem.addEventListener('click', handler);
+            return;
+        }
         if (!elem.hasAttribute('role')) elem.setAttribute('role', 'button');
         if (!elem.hasAttribute('tabindex')) elem.setAttribute('tabindex', '0');
         elem.addEventListener('click', handler);
@@ -1426,9 +1775,18 @@ window.AutoStat.App = {
 
         var toast = document.createElement('div');
         toast.className = 'toast toast-' + (type || 'info');
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
         toast.textContent = message;
         document.body.appendChild(toast);
-        setTimeout(function() { toast.remove(); }, 3000);
+        setTimeout(function() { toast.remove(); }, type === 'error' ? 5000 : 3500);
+    },
+
+    _focusHeading: function(selector) {
+        var heading = document.querySelector(selector);
+        if (!heading) return;
+        if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+        window.setTimeout(function() { heading.focus({ preventScroll: true }); }, 0);
     },
 
     _stripEmoji: function(text) {
