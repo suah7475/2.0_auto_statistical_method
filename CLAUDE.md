@@ -5,19 +5,20 @@
 
 ## 배포
 
-- **GitHub Pages**: https://suah7475.github.io/auto_statistical_method/
+- **GitHub Pages**: https://suah7475.github.io/2.0_auto_statistical_method/
 - 프론트엔드 전용 정적 사이트 (서버 불필요)
 
 ## 프로젝트 구조
 
 ```
-v2.0_auto_statistical_method/
+2.0_auto_statistical_method/
 ├── index.html              # 메인 UI (질문 흐름 + 결과 + 커스터마이저)
 ├── css/
 │   └── style.css           # 미니멀 스타일시트 (Pretendard 폰트, 흑백 디자인)
 ├── js/
-│   ├── stat-data.js        # 26개 통계 테스트 정의 + 8개 질문 정의
+│   ├── stat-data.js        # 26개 통계 테스트 정의 + 9개 조건부 질문 정의
 │   ├── stat-recommender.js # 통계 테스트 추천 엔진 (의사결정 트리)
+│   ├── data-validator.js   # 업로드 데이터와 변수 연결 사전 검증
 │   ├── r-code-customizer.js # R 코드 커스터마이저 v3.0 + 엑셀 내보내기
 │   ├── result-renderer.js  # 결과 렌더링 (쉬운 설명, 비유, 재활 예시)
 │   ├── webr-runner.js      # WebR 엔진 초기화, 패키지 설치, R 코드 실행
@@ -29,6 +30,13 @@ v2.0_auto_statistical_method/
 │   └── user-guide.html     # 사용법 안내서 (HTML)
 ├── images/
 │   └── 서울재활병원_가로형CI.png
+├── outputs/                # 5장 포트폴리오 인포그래픽, PPTX와 PDF
+├── tests/
+│   ├── run-tests.js        # 추천·검증·R 코드 자동 검사
+│   └── browser-smoke.js    # 데스크톱·모바일·WebR 통합 검사
+├── CHANGELOG.md            # 버전별 변경 이력
+├── VERSION                 # 현재 배포 버전
+├── .gitattributes          # PDF·PPTX·PNG 바이너리 처리
 ├── .nojekyll               # GitHub Pages Jekyll 비활성화
 ├── .gitignore              # Git 제외 파일
 └── CLAUDE.md               # 프로젝트 문서
@@ -42,7 +50,7 @@ v2.0_auto_statistical_method/
 ## 주요 기능
 
 ### 1. 플로우차트 기반 통계 방법 추천
-- **의사결정 흐름**: DV 유형 → DV 수준 → IV 개수 → IV 유형 → 그룹 수 → 대응 여부 → 정규성 → 공변량
+- **의사결정 흐름**: 결과 유형 → 결과 범주 → 원인/조건 개수 → 변수 종류 → 분석 목적 → 그룹 수 → 반복측정 → 정규성 → 공변량
 - **26개 통계 테스트 지원**: 모수/비모수 검정, 회귀분석, GLM 포함
 - **혼합 분석**: 연속형+범주형 독립변수 동시 처리 (ANCOVA, GLM 등)
 
@@ -86,7 +94,14 @@ v2.0_auto_statistical_method/
 - **재활 예시** (`rehab_example`): 재활 분야의 구체적인 사용 예시
 - **접기/펼치기**: 전문적인 설명은 `<details>`로 접기 처리
 
-### 3. R 코드 커스터마이저 v3.0 (고도화)
+### 3. 업로드 데이터 사전 검증
+- 중복·빈 열 이름과 분석에 사용할 수 없는 특수 열 이름을 확인합니다.
+- 숫자형·범주형·순서형 변수를 데이터 값과 열 이름을 함께 사용해 감지합니다.
+- 결측치와 분석 가능한 행 수, 그룹 수준 수, 반복측정 중복과 그룹 변경을 분석 전에 확인합니다.
+- 이분형 사건 범주, 다중범주 기준 범주와 순서형 범주 순서를 실제 데이터와 대조합니다.
+- 숫자와 문자열이 섞인 범주도 같은 값으로 정규화해 일관되게 처리합니다.
+
+### 4. R 코드 커스터마이저 v3.0 (고도화)
 사용자의 실제 엑셀 데이터에 맞춰 **논문 수준의 R 코드**를 자동 생성.
 생성된 코드를 R/RStudio에 붙여넣기하면 바로 통계 분석 실행 가능.
 
@@ -140,7 +155,7 @@ v2.0_auto_statistical_method/
 | `MASS` | polr (순서형 로지스틱 회귀) |
 | `nnet` | multinom (다중범주 로지스틱 회귀) |
 
-### 4. WebR 브라우저 실행 (v2.0 신규)
+### 5. WebR 브라우저 실행
 R 코드를 서버 없이 브라우저에서 직접 실행.
 
 #### 아키텍처
@@ -166,7 +181,7 @@ RCodeGenerators (원본 R 코드)
 - `captureOutput()`: 블록별 tryCatch 래핑 → 부분 오류도 계속 실행
 - `captureGraphics()`: canvas 디바이스로 그래프 캡처
 
-### 5. PubMed 논문 검색 + SCI-E 저널 필터링
+### 6. PubMed 논문 검색 + SCI-E 저널 필터링
 - **재활 분야 특화**: PT, OT, ST, 재활심리, 신경재활 영역 한정
 - **SCI-E 저널 화이트리스트**: 약 80개 재활·의학 SCI-E급 저널 목록으로 필터링
 - **SCI-E 필터 토글**: 체크박스로 SCI-E급만/전체 전환 (기본: SCI-E만)
@@ -181,7 +196,7 @@ RCodeGenerators (원본 R 코드)
 - **단순 테두리**: 1px solid #ddd, border-radius 3-4px
 - **이모지 없음**: UI 전체에서 이모지 제거, 텍스트만 사용
 
-## 질문 흐름 (8단계)
+## 질문 흐름 (9단계, 조건부)
 
 | 단계 | ID | 질문 | 조건 |
 |------|-----|------|------|
@@ -189,10 +204,11 @@ RCodeGenerators (원본 R 코드)
 | 2 | `dv_level` | 범주형 결과 변수 수준 | dv_type == "categorical" |
 | 3 | `iv_count` | 비교할 변수 개수 | 항상 |
 | 4 | `iv_types` | 비교 변수 종류 (다중 선택) | 항상 |
-| 5 | `group_count` | 그룹 수 (2개/3개 이상) | iv_types에 "categorical" 포함 |
-| 6 | `paired` | 대응 여부 (같은 사람 반복 측정?) | iv_types에 "categorical" 포함 |
-| 7 | `normality` | 정규분포 여부 | dv_type == "continuous" |
-| 8 | `has_covariate` | 공변량(통제 변수) 유무 | iv_count == "two_plus" |
+| 5 | `analysis_goal` | 숫자 두 개의 관계 확인/결과 예측 | 연속형 결과 + 숫자 원인 1개 |
+| 6 | `group_count` | 그룹 수 (2개/3개 이상) | 연속형 결과 + 그룹 원인 1개 |
+| 7 | `paired` | 같은 사람 반복 측정 여부 | 연속형 그룹 비교 또는 대응 이분형 결과 |
+| 8 | `normality` | 정규분포 여부 | 연속형 단일 원인 비교/상관 |
+| 9 | `has_covariate` | 공변량(통제 변수) 유무 | 연속형 결과 + 원인 2개 이상 + 그룹 변수 포함 |
 
 ## 지원 통계 테스트 (26종)
 
