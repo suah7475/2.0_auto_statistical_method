@@ -16,8 +16,7 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
             { role: "dv", label: "측정 변수 (숫자)", type: "continuous", required: true, help: "예: 악력, 점수, 혈압" }
         ],
         extras: [
-            { role: "mu", label: "비교 기준값", inputType: "number", defaultValue: 0, help: "비교할 기준 평균값 (예: 정상 기준 25)" },
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준 (보통 0.95)" }
+            { role: "mu", label: "비교 기준값", inputType: "number", defaultValue: 0, required: true, help: "비교할 기준 평균값 (예: 정상 기준 25)" }
         ]
     },
     "independent_t": {
@@ -25,9 +24,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         variables: [
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: VAS 점수, ROM, 악력" },
             { role: "group", label: "그룹 변수", type: "categorical", required: true, help: "예: 실험군/대조군, 치료A/치료B" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
         ]
     },
     "paired_t": {
@@ -38,9 +34,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         ],
         optionalVariables: [
             { role: "subject", label: "대상자 ID (선택)", type: "categorical", help: "대상자 식별 변수 (있으면 입력)" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
         ]
     },
     "mann_whitney": {
@@ -48,9 +41,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         variables: [
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: 통증 점수, 기능 점수" },
             { role: "group", label: "그룹 변수", type: "categorical", required: true, help: "예: 실험군/대조군" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
         ]
     },
     "wilcoxon_signed_rank": {
@@ -58,9 +48,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         variables: [
             { role: "pre", label: "사전 측정값", type: "continuous", required: true, help: "예: 치료 전 점수" },
             { role: "post", label: "사후 측정값", type: "continuous", required: true, help: "예: 치료 후 점수" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
         ]
     },
     "one_way_anova": {
@@ -68,12 +55,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         variables: [
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: 회복 점수" },
             { role: "group", label: "그룹 변수 (3개 이상)", type: "categorical", required: true, help: "예: 치료A/치료B/치료C" }
-        ],
-        optionalVariables: [
-            { role: "covariate", label: "공변량 (선택)", type: "continuous", help: "통제할 변수가 있으면 선택 (ANCOVA로 전환)" }
-        ],
-        extras: [
-            { role: "posthoc_method", label: "사후검정 방법", inputType: "select", options: ["tukey","bonferroni","holm"], defaultValue: "tukey", help: "Tukey(추천), Bonferroni(보수적), Holm(검정력 높음)" }
         ]
     },
     "kruskal_wallis": {
@@ -81,9 +62,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         variables: [
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: 통증 등급" },
             { role: "group", label: "그룹 변수 (3개 이상)", type: "categorical", required: true, help: "예: 치료A/치료B/치료C" }
-        ],
-        extras: [
-            { role: "posthoc_method", label: "사후검정 방법", inputType: "select", options: ["bonferroni","holm","BH"], defaultValue: "bonferroni", help: "Bonferroni(보수적), Holm(검정력 높음), BH(FDR 보정)" }
         ]
     },
     "two_way_anova": {
@@ -92,9 +70,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: 회복 점수" },
             { role: "factor1", label: "요인 1 (그룹)", type: "categorical", required: true, help: "예: 치료 유형" },
             { role: "factor2", label: "요인 2 (그룹)", type: "categorical", required: true, help: "예: 성별" }
-        ],
-        optionalVariables: [
-            { role: "covariate", label: "공변량 (선택)", type: "continuous", help: "통제할 변수가 있으면 선택" }
         ]
     },
     "repeated_anova": {
@@ -103,9 +78,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
             { role: "subject", label: "대상자 ID", type: "categorical", required: true, help: "예: 환자번호, ID" },
             { role: "time", label: "시점 변수", type: "categorical", required: true, help: "예: 전/중/후, Time1/Time2/Time3" },
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: 기능 점수" }
-        ],
-        optionalVariables: [
-            { role: "group", label: "집단 변수 (선택)", type: "categorical", help: "있으면 혼합 ANOVA로 전환 (예: 실험군/대조군)" }
         ],
         note: "데이터가 long format이어야 합니다 (한 행에 한 시점의 측정값)"
     },
@@ -125,9 +97,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
             { role: "group", label: "집단 변수 (between)", type: "categorical", required: true, help: "예: 실험군/대조군" },
             { role: "time", label: "시점 변수 (within)", type: "categorical", required: true, help: "예: 전/중/후" },
             { role: "dv", label: "종속변수 (측정값)", type: "continuous", required: true, help: "예: 기능 점수" }
-        ],
-        optionalVariables: [
-            { role: "covariate", label: "공변량 (선택)", type: "continuous", help: "통제할 변수가 있으면 선택 (예: 나이)" }
         ],
         note: "데이터가 long format이어야 합니다"
     },
@@ -172,9 +141,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         ],
         optionalVariables: [
             { role: "var_z", label: "추가 변수 Z (선택)", type: "continuous", help: "추가 상관 변수가 있으면 선택" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
         ]
     },
     "spearman_correlation": {
@@ -185,9 +151,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         ],
         optionalVariables: [
             { role: "var_z", label: "추가 변수 Z (선택)", type: "continuous", help: "추가 상관 변수가 있으면 선택" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
         ]
     },
     "point_biserial": {
@@ -202,9 +165,6 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         variables: [
             { role: "dv", label: "종속변수 (예측할 값)", type: "continuous", required: true, help: "예: 회복 점수" },
             { role: "iv", label: "독립변수 (예측에 사용)", type: "continuous", required: true, help: "예: 치료 기간" }
-        ],
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 및 예측구간 수준" }
         ]
     },
     "multiple_regression": {
@@ -214,10 +174,7 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         ],
         multiIV: true,
         multiIVLabel: "독립변수 (여러 개 선택 가능)",
-        multiIVHelp: "예: 나이, 치료횟수, 성별 등",
-        extras: [
-            { role: "conf_level", label: "신뢰수준", inputType: "select", options: ["0.90","0.95","0.99"], defaultValue: "0.95", help: "신뢰구간 수준" }
-        ]
+        multiIVHelp: "예: 나이, 치료횟수, 성별 등"
     },
     "dummy_regression": {
         label: "더미변수 회귀분석",
@@ -226,10 +183,7 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         ],
         multiIV: true,
         multiIVLabel: "독립변수 (범주형 포함, 여러 개 선택)",
-        multiIVHelp: "예: 치료유형(A/B/C), 성별",
-        extras: [
-            { role: "ref_group", label: "기준 그룹 (선택)", inputType: "text", defaultValue: "", help: "범주형 변수의 기준 그룹명 (예: 대조군)" }
-        ]
+        multiIVHelp: "예: 치료유형(A/B/C), 나이"
     },
     "logistic_regression": {
         label: "이분형 로지스틱 회귀",
@@ -240,7 +194,8 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         multiIVLabel: "독립변수 (여러 개 선택 가능)",
         multiIVHelp: "예: 나이, 중증도, 치료유형",
         extras: [
-            { role: "cutoff", label: "분류 기준값 (Cutoff)", inputType: "number", defaultValue: 0.5, help: "예측 확률의 분류 기준 (기본 0.5)" }
+            { role: "event_category", label: "사건으로 볼 결과 (1)", inputType: "data-select", sourceRole: "dv", required: true, help: "예: 성공, 호전, 낙상 발생" },
+            { role: "cutoff", label: "분류 기준값", inputType: "number", defaultValue: 0.5, required: true, min: 0.01, max: 0.99, step: 0.01, help: "보통 0.5를 사용합니다." }
         ]
     },
     "multinomial_logistic": {
@@ -252,7 +207,7 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         multiIVLabel: "독립변수 (여러 개 선택 가능)",
         multiIVHelp: "예: 나이, 중증도",
         extras: [
-            { role: "ref_category", label: "기준 범주 (선택)", inputType: "text", defaultValue: "", help: "기준이 될 종속변수 범주명 (예: 유지)" }
+            { role: "ref_category", label: "비교 기준이 될 결과", inputType: "data-select", sourceRole: "dv", required: true, help: "다른 결과 범주를 이 값과 비교합니다." }
         ]
     },
     "ordinal_regression": {
@@ -262,7 +217,10 @@ window.AutoStat.TEST_VARIABLE_REQUIREMENTS = {
         ],
         multiIV: true,
         multiIVLabel: "독립변수 (여러 개 선택 가능)",
-        multiIVHelp: "예: 나이, 치료 기간"
+        multiIVHelp: "예: 나이, 치료 기간",
+        extras: [
+            { role: "ordinal_order", label: "결과 범주의 순서", inputType: "data-order", sourceRole: "dv", required: true, help: "낮은 단계부터 높은 단계 순으로 확인하세요." }
+        ]
     },
     "glm_covariate": {
         label: "일반선형모형 (공변량 포함)",
@@ -302,7 +260,7 @@ window.AutoStat.TypeDetector = {
         ],
         categorical: [
             /(성별|gender|male|female|남|여|남성|여성|sex)/i,
-            /(그룹|group|treatment|치료|약|운동|약물|intervention)/i,
+            /(그룹|group|treatment[ _-]*(group|arm|type)|치료[ _-]*(군|그룹|유형|방법)|약물군|운동군|intervention[ _-]*(group|arm|type))/i,
             /(yes|no|예|아니오|성공|실패|합격|불합격|true|false)/i,
             /(type|유형|종류|방식|category|범주)/i,
             /(실험|대조|control|experimental|placebo)/i,
@@ -472,6 +430,11 @@ window.AutoStat.RCodeCustomizer = {
             this._showToast('유효한 컬럼을 찾을 수 없습니다.', 'error');
             return;
         }
+        var headerReport = window.AutoStat.DataValidator.validateHeaders(this.columns);
+        if (!headerReport.valid) {
+            this._showToast(headerReport.errors[0], 'error');
+            return;
+        }
 
         // 타입 감지
         this.columnTypes = window.AutoStat.TypeDetector.detectMultiple(this.columns);
@@ -492,8 +455,8 @@ window.AutoStat.RCodeCustomizer = {
         this.columns.forEach(function(col) {
             var detectedType = self.columnTypes[col] || 'continuous';
             html += '<div class="column-type-item">' +
-                '<div class="column-name">' + col + '</div>' +
-                '<select class="type-select" data-column="' + col + '">' +
+                '<div class="column-name">' + self._escapeHtml(col) + '</div>' +
+                '<select class="type-select" aria-label="' + self._escapeHtml(col) + ' 유형" data-column="' + self._escapeHtml(col) + '">' +
                     '<option value="continuous"' + (detectedType === 'continuous' ? ' selected' : '') + '>연속형 (숫자)</option>' +
                     '<option value="categorical"' + (detectedType === 'categorical' ? ' selected' : '') + '>범주형 (그룹)</option>' +
                     '<option value="ordinal"' + (detectedType === 'ordinal' ? ' selected' : '') + '>순서형 (등급)</option>' +
@@ -509,7 +472,7 @@ window.AutoStat.RCodeCustomizer = {
         var self = this;
 
         // 사용자 선택 타입 읽기
-        var typeSelects = document.querySelectorAll('.type-select');
+        var typeSelects = document.querySelectorAll('#column-types .type-select');
         typeSelects.forEach(function(select) {
             var col = select.getAttribute('data-column');
             self.columnTypes[col] = select.value;
@@ -535,7 +498,7 @@ window.AutoStat.RCodeCustomizer = {
 
         // 테스트별 안내 메시지
         if (req.note) {
-            html += '<div class="mapping-note">' + req.note + '</div>';
+            html += '<div class="mapping-note">' + this._escapeHtml(req.note) + '</div>';
         }
 
         // 필수 변수 매핑
@@ -570,19 +533,20 @@ window.AutoStat.RCodeCustomizer = {
     _buildVariableSelect: function(role, label, preferredType, helpText, isOptional) {
         var self = this;
         var cssClass = isOptional ? 'mapping-group mapping-optional' : 'mapping-group';
+        var selectId = 'code-map-' + role;
         var html = '<div class="' + cssClass + '">';
-        html += '<label class="mapping-label">' + label + '</label>';
+        html += '<label class="mapping-label" for="' + this._escapeHtml(selectId) + '">' + this._escapeHtml(label) + '</label>';
         if (helpText) {
-            html += '<span class="mapping-help">' + helpText + '</span>';
+            html += '<span class="mapping-help">' + this._escapeHtml(helpText) + '</span>';
         }
-        html += '<select class="mapping-select" data-role="' + role + '"' + (isOptional ? ' data-optional="true"' : '') + '>';
+        html += '<select id="' + this._escapeHtml(selectId) + '" class="mapping-select" data-role="' + this._escapeHtml(role) + '"' + (isOptional ? ' data-optional="true"' : '') + '>';
         html += '<option value="">' + (isOptional ? '-- 사용 안 함 --' : '-- 선택하세요 --') + '</option>';
 
         this.columns.forEach(function(col) {
             var type = self.columnTypes[col];
             var typeLabel = type === 'continuous' ? '숫자' : (type === 'categorical' ? '그룹' : '등급');
             var recommended = (type === preferredType) ? ' *' : '';
-            html += '<option value="' + col + '">' + col + ' (' + typeLabel + ')' + recommended + '</option>';
+            html += '<option value="' + self._escapeHtml(col) + '">' + self._escapeHtml(col) + ' (' + typeLabel + ')' + recommended + '</option>';
         });
 
         html += '</select>';
@@ -593,9 +557,9 @@ window.AutoStat.RCodeCustomizer = {
     _buildMultiIVCheckboxes: function(label, helpText) {
         var self = this;
         var html = '<div class="mapping-group">';
-        html += '<label class="mapping-label">' + label + '</label>';
+        html += '<div class="mapping-label">' + this._escapeHtml(label) + '</div>';
         if (helpText) {
-            html += '<span class="mapping-help">' + helpText + '</span>';
+            html += '<span class="mapping-help">' + this._escapeHtml(helpText) + '</span>';
         }
         html += '<div class="mapping-checkboxes">';
 
@@ -603,8 +567,8 @@ window.AutoStat.RCodeCustomizer = {
             var type = self.columnTypes[col];
             var typeLabel = type === 'continuous' ? '숫자' : (type === 'categorical' ? '그룹' : '등급');
             html += '<div class="checkbox-item">';
-            html += '<input type="checkbox" id="multi-iv-' + idx + '" value="' + col + '" class="multi-iv-checkbox">';
-            html += '<label for="multi-iv-' + idx + '">' + col + ' (' + typeLabel + ')</label>';
+            html += '<input type="checkbox" id="multi-iv-' + idx + '" value="' + self._escapeHtml(col) + '" class="multi-iv-checkbox">';
+            html += '<label for="multi-iv-' + idx + '">' + self._escapeHtml(col) + ' (' + typeLabel + ')</label>';
             html += '</div>';
         });
 
@@ -613,20 +577,26 @@ window.AutoStat.RCodeCustomizer = {
     },
 
     _buildExtraInput: function(extra) {
+        var inputId = 'code-extra-' + extra.role;
         var html = '<div class="mapping-group">';
-        html += '<label class="mapping-label">' + extra.label + '</label>';
+        html += '<label class="mapping-label" for="' + this._escapeHtml(inputId) + '">' + this._escapeHtml(extra.label) + '</label>';
         if (extra.help) {
-            html += '<span class="mapping-help">' + extra.help + '</span>';
+            html += '<span class="mapping-help">' + this._escapeHtml(extra.help) + '</span>';
         }
         if (extra.inputType === 'select' && extra.options) {
-            html += '<select class="mapping-input mapping-select" data-extra="' + extra.role + '">';
+            html += '<select id="' + this._escapeHtml(inputId) + '" class="mapping-input mapping-select" data-extra="' + this._escapeHtml(extra.role) + '">';
             extra.options.forEach(function(opt) {
                 var selected = (opt === extra.defaultValue) ? ' selected' : '';
-                html += '<option value="' + opt + '"' + selected + '>' + opt + '</option>';
+                html += '<option value="' + String(opt).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"' + selected + '>' + String(opt).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</option>';
             });
             html += '</select>';
         } else {
-            html += '<input type="' + (extra.inputType || 'text') + '" class="mapping-input" data-extra="' + extra.role + '" value="' + (extra.defaultValue || '') + '">';
+            var inputType = extra.inputType === 'number' ? 'number' : 'text';
+            var placeholder = extra.inputType === 'data-order' ? '예: 경증 | 중등증 | 중증' : (extra.inputType === 'data-select' ? '예: 성공' : '');
+            html += '<input id="' + this._escapeHtml(inputId) + '" type="' + inputType + '" class="mapping-input" data-extra="' + this._escapeHtml(extra.role) + '" value="' + this._escapeHtml(extra.defaultValue === undefined ? '' : extra.defaultValue) + '" placeholder="' + this._escapeHtml(placeholder) + '"' +
+                (extra.min !== undefined ? ' min="' + extra.min + '"' : '') +
+                (extra.max !== undefined ? ' max="' + extra.max + '"' : '') +
+                (extra.step !== undefined ? ' step="' + extra.step + '"' : '') + '>';
         }
         html += '</div>';
         return html;
@@ -638,7 +608,8 @@ window.AutoStat.RCodeCustomizer = {
         var self = this;
         this.variableMapping = {};
 
-        var selects = document.querySelectorAll('.mapping-select');
+        var mappingRoot = document.getElementById('variable-mapping');
+        var selects = mappingRoot.querySelectorAll('.mapping-select[data-role]');
         selects.forEach(function(sel) {
             var role = sel.getAttribute('data-role');
             if (sel.value) {
@@ -648,14 +619,14 @@ window.AutoStat.RCodeCustomizer = {
 
         // 다중 IV
         this.multiIVSelections = [];
-        var checkboxes = document.querySelectorAll('.multi-iv-checkbox:checked');
+        var checkboxes = mappingRoot.querySelectorAll('.multi-iv-checkbox:checked');
         checkboxes.forEach(function(cb) {
             self.multiIVSelections.push(cb.value);
         });
 
         // 추가값
         this.extraValues = {};
-        var extraInputs = document.querySelectorAll('.mapping-input');
+        var extraInputs = mappingRoot.querySelectorAll('.mapping-input[data-extra]');
         extraInputs.forEach(function(inp) {
             var key = inp.getAttribute('data-extra');
             if (key) {
@@ -663,30 +634,100 @@ window.AutoStat.RCodeCustomizer = {
             }
         });
 
-        // 필수 변수 검증
-        var req = window.AutoStat.TEST_VARIABLE_REQUIREMENTS[this.testId];
-        if (req) {
-            for (var i = 0; i < req.variables.length; i++) {
-                var v = req.variables[i];
-                if (v.required && !this.variableMapping[v.role]) {
-                    this._showToast('"' + v.label + '"을(를) 선택해주세요.', 'error');
-                    return;
-                }
-            }
-            if (req.multiIV && this.multiIVSelections.length === 0) {
-                this._showToast('독립변수를 최소 1개 선택해주세요.', 'error');
-                return;
-            }
+        var setupReport = this._validateCustomizerSetup();
+        if (!setupReport.valid) {
+            this._showToast(setupReport.error, 'error');
+            return;
         }
 
         // R 코드 생성
-        this.customizedCode = this._generateCustomCode();
+        try {
+            this.customizedCode = this._generateCustomCode();
+        } catch (error) {
+            this._showToast('R 코드를 만들 수 없습니다: ' + error.message, 'error');
+            return;
+        }
 
         if (this.customizedCode) {
             this._displayCode(this.customizedCode);
             this._showStep('result');
             this._showToast('R 코드가 생성되었습니다!', 'success');
         }
+    },
+
+    _validateCustomizerSetup: function() {
+        var req = window.AutoStat.TEST_VARIABLE_REQUIREMENTS[this.testId];
+        if (!req) return { valid: false, error: '이 분석의 변수 설정을 찾을 수 없습니다.' };
+
+        for (var i = 0; i < (req.variables || []).length; i++) {
+            var variable = req.variables[i];
+            var column = this.variableMapping[variable.role];
+            if (variable.required && !column) {
+                return { valid: false, error: '"' + variable.label + '"을(를) 선택해주세요.' };
+            }
+            if (!column) continue;
+
+            var actualType = this.columnTypes[column];
+            if (variable.type === 'continuous' && actualType !== 'continuous') {
+                return { valid: false, error: '"' + variable.label + '"에는 숫자 열을 선택해주세요.' };
+            }
+            if (variable.type === 'categorical' && actualType === 'continuous') {
+                return { valid: false, error: '"' + variable.label + '"에는 그룹 열을 선택해주세요.' };
+            }
+            if (variable.type === 'ordinal' && actualType !== 'ordinal') {
+                return { valid: false, error: '"' + variable.label + '"에는 순서형 열을 선택해주세요.' };
+            }
+        }
+
+        if (req.multiIV) {
+            var minimumPredictors = ['multiple_regression', 'dummy_regression', 'glm_anova'].indexOf(this.testId) !== -1 ? 2 : 1;
+            if (this.multiIVSelections.length < minimumPredictors) {
+                return { valid: false, error: '독립변수를 ' + minimumPredictors + '개 이상 선택해주세요.' };
+            }
+            if (['multiple_regression', 'glm_anova'].indexOf(this.testId) !== -1) {
+                var nonNumeric = this.multiIVSelections.find(function(selected) {
+                    return this.columnTypes[selected] !== 'continuous';
+                }, this);
+                if (nonNumeric) {
+                    return { valid: false, error: '"' + nonNumeric + '"은(는) 숫자 열로 설정해주세요.' };
+                }
+            }
+            if (this.testId === 'dummy_regression') {
+                var hasGroupPredictor = this.multiIVSelections.some(function(selected) {
+                    return this.columnTypes[selected] === 'categorical' || this.columnTypes[selected] === 'ordinal';
+                }, this);
+                if (!hasGroupPredictor) {
+                    return { valid: false, error: '더미변수 회귀에는 그룹 열을 하나 이상 선택해주세요.' };
+                }
+            }
+        }
+
+        for (var e = 0; e < (req.extras || []).length; e++) {
+            var extra = req.extras[e];
+            var value = this.extraValues[extra.role];
+            if (extra.required && !String(value === undefined || value === null ? '' : value).trim()) {
+                return { valid: false, error: '"' + extra.label + '"을(를) 입력해주세요.' };
+            }
+            if (extra.inputType === 'number') {
+                var number = Number(value);
+                if (!Number.isFinite(number) || (extra.min !== undefined && number < extra.min) ||
+                    (extra.max !== undefined && number > extra.max)) {
+                    return { valid: false, error: '"' + extra.label + '"의 숫자 범위를 확인해주세요.' };
+                }
+            }
+        }
+
+        var selectedColumns = Object.keys(this.variableMapping).map(function(role) {
+            return this.variableMapping[role];
+        }, this).concat(this.multiIVSelections);
+        var duplicate = selectedColumns.find(function(selected, index) {
+            return selectedColumns.indexOf(selected) !== index;
+        });
+        if (duplicate) {
+            return { valid: false, error: '"' + duplicate + '" 열이 중복 선택되었습니다.' };
+        }
+
+        return { valid: true, error: '' };
     },
 
     // ==================== R 코드 생성 엔진 ====================
@@ -696,14 +737,16 @@ window.AutoStat.RCodeCustomizer = {
             return this._generateGenericCode();
         }
 
-        var code = gen.call(this, {
+        var params = {
             filePath: this.filePath,
             fileFormat: this.fileFormat,
             vars: this.variableMapping,
             multiIV: this.multiIVSelections,
             extras: this.extraValues,
             columnTypes: this.columnTypes
-        });
+        };
+        this._assertSafeParams(params);
+        var code = gen.call(this, params);
 
         // 엑셀 결과 내보내기 코드 추가
         code += this._generateExcelExportCode();
@@ -734,27 +777,22 @@ window.AutoStat.RCodeCustomizer = {
         var fp = this.filePath ? this.filePath.replace(/\\/g, '/').replace(/^["']+|["']+$/g, '') : '';
         var fileName = fp ? fp.split('/').pop() : '(직접입력)';
 
-        // 변수 정보 문자열
+        // 테스트 정의의 실제 역할명을 사용해 분석정보를 빠짐없이 기록한다.
         var varParts = [];
-        if (vars.dv) varParts.push('DV: ' + vars.dv);
-        if (vars.group) varParts.push('Group: ' + vars.group);
-        if (vars.iv) varParts.push('IV: ' + vars.iv);
-        if (vars.time) varParts.push('Time: ' + vars.time);
-        if (vars.subj) varParts.push('ID: ' + vars.subj);
-        if (vars.cov) varParts.push('Cov: ' + vars.cov);
-        if (vars.var_x) varParts.push('X: ' + vars.var_x);
-        if (vars.var_y) varParts.push('Y: ' + vars.var_y);
-        if (vars.pre) varParts.push('Pre: ' + vars.pre);
-        if (vars.post) varParts.push('Post: ' + vars.post);
-        if (vars.row_var) varParts.push('Row: ' + vars.row_var);
-        if (vars.col_var) varParts.push('Col: ' + vars.col_var);
+        var definedVariables = req ? (req.variables || []).concat(req.optionalVariables || []) : [];
+        definedVariables.forEach(function(variable) {
+            if (vars[variable.role]) varParts.push(variable.label + ': ' + vars[variable.role]);
+        });
+        if (this.multiIVSelections && this.multiIVSelections.length > 0) {
+            varParts.push((req.multiIVLabel || '독립변수') + ': ' + this.multiIVSelections.join(', '));
+        }
         var varStr = (varParts.join(', ') || '-').replace(/"/g, "'");
 
         // ──── 분석정보 시트 (공통) ────
         code += '# ──── 분석정보 ────\n';
         code += 'result_sheets[["분석정보"]] <- data.frame(\n';
         code += '  항목 = c("분석방법", "데이터파일", "분석일시", "변수"),\n';
-        code += '  내용 = c("' + label + '", "' + fileName.replace(/"/g, "'") + '", as.character(Sys.time()), "' + varStr + '")\n';
+        code += '  내용 = c(' + this._rString(label) + ', ' + this._rString(fileName) + ', as.character(Sys.time()), ' + this._rString(varStr) + ')\n';
         code += ')\n\n';
 
         // ════════════════════════════════════════
@@ -1239,7 +1277,7 @@ window.AutoStat.RCodeCustomizer = {
         var timestamp = 'format(Sys.time(), "%Y%m%d_%H%M")';
         code += '\n# ──── 엑셀 파일 저장 ────\n';
         if (fp) {
-            code += 'output_dir <- dirname("' + fp + '")\n';
+            code += 'output_dir <- dirname(' + this._rString(fp) + ')\n';
         } else {
             code += 'output_dir <- getwd()\n';
         }
@@ -1257,19 +1295,61 @@ window.AutoStat.RCodeCustomizer = {
 
     // ==================== R 코드 헬퍼 함수 ====================
     // 백틱 래핑 (한국어/공백 포함 변수명 보호)
-    _bt: function(v) { return '`' + v + '`'; },
+    _bt: function(v) { return '`' + String(v).replace(/\\/g, '\\\\').replace(/`/g, '\\`') + '`'; },
     // df$변수 (백틱 포함)
-    _dfVar: function(v) { return 'df$`' + v + '`'; },
+    _dfVar: function(v) { return 'df$' + this._bt(v); },
     // formula 생성: `dv` ~ `iv1` + `iv2`
     _formula: function(dv, ivs) {
-        var bt = function(v) { return '`' + v + '`'; };
+        var self = this;
+        var bt = function(v) { return self._bt(v); };
         if (typeof ivs === 'string') return bt(dv) + ' ~ ' + bt(ivs);
         return bt(dv) + ' ~ ' + ivs.map(bt).join(' + ');
     },
     // 인터랙션 formula: `dv` ~ `iv1` * `iv2`
     _formulaInteraction: function(dv, iv1, iv2) {
-        var bt = function(v) { return '`' + v + '`'; };
+        var self = this;
+        var bt = function(v) { return self._bt(v); };
         return bt(dv) + ' ~ ' + bt(iv1) + ' * ' + bt(iv2);
+    },
+
+    _rString: function(value) {
+        return '"' + String(value === undefined || value === null ? '' : value)
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"')
+            .replace(/\r/g, '\\r')
+            .replace(/\n/g, '\\n') + '"';
+    },
+
+    _rStringArray: function(values) {
+        return 'c(' + (values || []).map(this._rString.bind(this)).join(', ') + ')';
+    },
+
+    _safeNumber: function(value, fallback, min, max) {
+        var number = Number(value);
+        if (!Number.isFinite(number)) number = fallback;
+        if (!Number.isFinite(number) || (min !== undefined && number < min) || (max !== undefined && number > max)) {
+            throw new Error('숫자 분석 옵션의 범위를 확인해주세요.');
+        }
+        return String(number);
+    },
+
+    _assertSafeParams: function(params) {
+        var names = [];
+        Object.keys((params && params.vars) || {}).forEach(function(role) {
+            if (params.vars[role]) names.push(params.vars[role]);
+        });
+        names = names.concat((params && params.multiIV) || []);
+        var report = window.AutoStat.DataValidator.validateHeaders(names);
+        if (!report.valid) throw new Error(report.errors[0]);
+    },
+
+    _escapeHtml: function(value) {
+        return String(value === undefined || value === null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     },
 
     _generateDataLoadCode: function(filePath, fileFormat) {
@@ -1282,7 +1362,7 @@ window.AutoStat.RCodeCustomizer = {
             code += 'library(readxl)\n\n';
             if (fp) {
                 code += '# 데이터 불러오기\n';
-                code += 'df <- read_excel("' + fp + '")\n';
+                code += 'df <- read_excel(' + this._rString(fp) + ', .name_repair = "minimal")\n';
             } else {
                 code += '# 데이터 불러오기 (파일 경로를 입력하세요)\n';
                 code += 'df <- read_excel("여기에_파일경로.xlsx")\n';
@@ -1290,10 +1370,10 @@ window.AutoStat.RCodeCustomizer = {
         } else {
             if (fp) {
                 code += '# 데이터 불러오기\n';
-                code += 'df <- read.csv("' + fp + '", header = TRUE, fileEncoding = "UTF-8")\n';
+                code += 'df <- read.csv(' + this._rString(fp) + ', header = TRUE, fileEncoding = "UTF-8", check.names = FALSE)\n';
             } else {
                 code += '# 데이터 불러오기 (파일 경로를 입력하세요)\n';
-                code += 'df <- read.csv("여기에_파일경로.csv", header = TRUE, fileEncoding = "UTF-8")\n';
+                code += 'df <- read.csv("여기에_파일경로.csv", header = TRUE, fileEncoding = "UTF-8", check.names = FALSE)\n';
             }
         }
 
@@ -1444,7 +1524,7 @@ window.AutoStat.RCodeGenerators = {
     // ========== 일표본 t-검정 ==========
     one_sample_t: function(p) {
         var dv = p.vars.dv;
-        var mu = p.extras.mu || 0;
+        var mu = this._safeNumber((p.extras || {}).mu, 0);
         var D = this._dfVar(dv);
         var code = '';
         code += '# ================================================\n';
@@ -2802,8 +2882,10 @@ window.AutoStat.RCodeGenerators = {
         code += this._generateDataLoadCode(p.filePath, p.fileFormat);
         code += '\n# ──── 3. 데이터 전처리: 범주형 → factor 변환 ────\n';
         ivs.forEach(function(iv) {
-            code += self._dfVar(iv) + ' <- factor(' + self._dfVar(iv) + ')\n';
-            code += 'cat("' + iv + ' 수준:", levels(' + self._dfVar(iv) + '), "\\n")\n';
+            if (p.columnTypes && (p.columnTypes[iv] === 'categorical' || p.columnTypes[iv] === 'ordinal')) {
+                code += self._dfVar(iv) + ' <- factor(' + self._dfVar(iv) + ')\n';
+                code += 'cat(' + self._rString(iv + ' 수준:') + ', levels(' + self._dfVar(iv) + '), "\\n")\n';
+            }
         });
         code += 'df <- df[complete.cases(df[, c("' + [dv].concat(ivs).join('", "') + '")]), ]\n';
         code += 'cat("분석 대상:", nrow(df), "명\\n")\n\n';
@@ -2858,6 +2940,8 @@ window.AutoStat.RCodeGenerators = {
         var ivs = p.multiIV;
         var DV = this._dfVar(dv);
         var f = this._formula(dv, ivs);
+        var eventCategory = String((p.extras || {}).event_category || '').trim();
+        var cutoff = this._safeNumber((p.extras || {}).cutoff, 0.5, 0.01, 0.99);
         var code = '';
         code += '# ================================================\n';
         code += '# 이분형 로지스틱 회귀 (Binary Logistic Regression)\n';
@@ -2873,13 +2957,15 @@ window.AutoStat.RCodeGenerators = {
         code += this._generateDataLoadCode(p.filePath, p.fileFormat);
         code += '\n# ──── 3. 데이터 전처리 ────\n';
         ivs.forEach(function(iv) {
-            if (p.columnTypes && p.columnTypes[iv] === 'categorical') {
+            if (p.columnTypes && (p.columnTypes[iv] === 'categorical' || p.columnTypes[iv] === 'ordinal')) {
                 code += self._dfVar(iv) + ' <- factor(' + self._dfVar(iv) + ')\n';
             }
         });
-        code += '# DV를 0/1 숫자로 확인\n';
-        code += DV + ' <- as.numeric(factor(' + DV + ')) - 1\n';
-        code += 'cat("DV 수준:", unique(' + DV + '), "\\n")\n';
+        code += '# 사용자가 선택한 사건 범주를 1, 나머지를 0으로 변환\n';
+        code += 'event_category <- ' + this._rString(eventCategory) + '\n';
+        code += 'if (!event_category %in% unique(as.character(' + DV + '))) stop("선택한 사건 범주가 데이터에 없습니다.")\n';
+        code += DV + ' <- as.integer(as.character(' + DV + ') == event_category)\n';
+        code += 'cat("사건 범주 (1):", event_category, "\\n")\n';
         code += 'cat("0:", sum(' + DV + ' == 0), "명, 1:", sum(' + DV + ' == 1), "명\\n")\n';
         code += 'df <- df[complete.cases(df[, c("' + [dv].concat(ivs).join('", "') + '")]), ]\n';
         code += 'cat("분석 대상:", nrow(df), "명\\n")\n\n';
@@ -2918,12 +3004,14 @@ window.AutoStat.RCodeGenerators = {
         code += '# ──── 8. 예측 성능 + ROC 곡선 ────\n';
         code += 'cat("\\n=== 예측 성능 ===\\n")\n';
         code += 'pred_prob <- predict(model, type = "response")\n';
-        code += 'pred_class <- ifelse(pred_prob > 0.5, 1, 0)\n';
+        code += 'cutoff <- ' + cutoff + '\n';
+        code += 'pred_class <- ifelse(pred_prob >= cutoff, 1, 0)\n';
         code += 'confusion <- table(실제 = ' + DV + ', 예측 = pred_class)\n';
         code += 'print(confusion)\n';
         code += 'acc <- sum(diag(confusion)) / sum(confusion)\n';
         code += 'sensitivity <- confusion[2, 2] / sum(confusion[2, ])\n';
         code += 'specificity <- confusion[1, 1] / sum(confusion[1, ])\n';
+        code += 'cat("분류 기준값:", cutoff, "\\n")\n';
         code += 'cat("정확도:", round(acc * 100, 1), "%\\n")\n';
         code += 'cat("민감도:", round(sensitivity * 100, 1), "%\\n")\n';
         code += 'cat("특이도:", round(specificity * 100, 1), "%\\n")\n\n';
@@ -2955,6 +3043,7 @@ window.AutoStat.RCodeGenerators = {
         var ivs = p.multiIV;
         var DV = this._dfVar(dv);
         var f = this._formula(dv, ivs);
+        var refCategory = String((p.extras || {}).ref_category || '').trim();
         var code = '';
         code += '# ================================================\n';
         code += '# 다중범주 로지스틱 회귀 (Multinomial Logistic Regression)\n';
@@ -2970,10 +3059,13 @@ window.AutoStat.RCodeGenerators = {
         code += this._generateDataLoadCode(p.filePath, p.fileFormat);
         code += '\n# ──── 3. 데이터 전처리 ────\n';
         code += DV + ' <- factor(' + DV + ')\n';
+        code += 'ref_category <- ' + this._rString(refCategory) + '\n';
+        code += 'if (!ref_category %in% levels(' + DV + ')) stop("선택한 기준 범주가 데이터에 없습니다.")\n';
+        code += DV + ' <- relevel(' + DV + ', ref = ref_category)\n';
         code += 'cat("DV 수준:", levels(' + DV + '), "\\n")\n';
-        code += 'cat("기준 범주 (reference):", levels(' + DV + ')[1], "\\n")\n';
+        code += 'cat("기준 범주 (reference):", ref_category, "\\n")\n';
         ivs.forEach(function(iv) {
-            if (p.columnTypes && p.columnTypes[iv] === 'categorical') {
+            if (p.columnTypes && (p.columnTypes[iv] === 'categorical' || p.columnTypes[iv] === 'ordinal')) {
                 code += self._dfVar(iv) + ' <- factor(' + self._dfVar(iv) + ')\n';
             }
         });
@@ -2994,10 +3086,14 @@ window.AutoStat.RCodeGenerators = {
         code += 'cat("\\n=== 오즈비 (OR) ===\\n")\n';
         code += 'or_vals <- exp(coef(model))\n';
         code += 'print(round(or_vals, 3))\n\n';
-        code += '# 95% CI\n';
+        code += '# Wald 95% CI\n';
         code += 'cat("\\n=== OR 95% CI ===\\n")\n';
-        code += 'ci <- exp(confint.default(model))\n';
-        code += 'print(round(ci, 3))\n\n';
+        code += 'coef_mat <- summary(model)$coefficients\n';
+        code += 'se_mat <- summary(model)$standard.errors\n';
+        code += 'ci_lower <- exp(coef_mat - 1.96 * se_mat)\n';
+        code += 'ci_upper <- exp(coef_mat + 1.96 * se_mat)\n';
+        code += 'cat("하한:\\n"); print(round(ci_lower, 3))\n';
+        code += 'cat("상한:\\n"); print(round(ci_upper, 3))\n\n';
         code += '# ──── 6. 모형 적합도 ────\n';
         code += 'cat("\\n=== 모형 적합도 ===\\n")\n';
         code += 'null_model <- multinom(' + this._bt(dv) + ' ~ 1, data = df, trace = FALSE)\n';
@@ -3029,6 +3125,7 @@ window.AutoStat.RCodeGenerators = {
         var ivs = p.multiIV;
         var DV = this._dfVar(dv);
         var f = this._formula(dv, ivs);
+        var ordinalOrder = window.AutoStat.DataValidator.parseOrder((p.extras || {}).ordinal_order);
         var code = '';
         code += '# ================================================\n';
         code += '# 순서형 로지스틱 회귀 (Ordinal Logistic Regression)\n';
@@ -3044,10 +3141,17 @@ window.AutoStat.RCodeGenerators = {
         code += this._generateDataLoadCode(p.filePath, p.fileFormat);
         code += '\n# ──── 3. 데이터 전처리 ────\n';
         code += '# DV를 순서형 factor로 변환\n';
-        code += DV + ' <- factor(' + DV + ', ordered = TRUE)\n';
+        if (ordinalOrder.length > 0) {
+            code += 'ordinal_levels <- ' + this._rStringArray(ordinalOrder) + '\n';
+            code += 'if (!setequal(unique(as.character(' + DV + ')), ordinal_levels)) stop("입력한 범주 순서와 데이터 값이 일치하지 않습니다.")\n';
+            code += DV + ' <- factor(' + DV + ', levels = ordinal_levels, ordered = TRUE)\n';
+        } else {
+            code += '# 범주 순서를 입력하지 않은 경우 데이터에 처음 나타난 순서를 사용합니다.\n';
+            code += DV + ' <- factor(' + DV + ', levels = unique(as.character(' + DV + ')), ordered = TRUE)\n';
+        }
         code += 'cat("DV 순서:", levels(' + DV + '), "\\n")\n';
         ivs.forEach(function(iv) {
-            if (p.columnTypes && p.columnTypes[iv] === 'categorical') {
+            if (p.columnTypes && (p.columnTypes[iv] === 'categorical' || p.columnTypes[iv] === 'ordinal')) {
                 code += self._dfVar(iv) + ' <- factor(' + self._dfVar(iv) + ')\n';
             }
         });
@@ -3218,7 +3322,8 @@ window.AutoStat.RCodeGenerators = {
         code += '  최소 = sapply(df[, all_vars], min, na.rm = TRUE),\n';
         code += '  최대 = sapply(df[, all_vars], max, na.rm = TRUE)\n';
         code += ')\n';
-        code += 'print(round(desc, 3))\n\n';
+        code += 'desc[-1] <- lapply(desc[-1], round, digits = 3)\n';
+        code += 'print(desc)\n\n';
         code += 'cat("\\n=== 상관행렬 ===\\n")\n';
         code += 'cor_matrix <- cor(df[, all_vars], use = "complete.obs")\n';
         code += 'print(round(cor_matrix, 3))\n\n';

@@ -407,16 +407,16 @@ window.AutoStat.QUESTIONS = [
         step: 1,
         id: "dv_type",
         question: "알아보고 싶은 '결과'는 어떤 종류인가요?",
-        help: "💡 결과 변수(종속변수)의 종류를 선택하세요!",
+        help: "연구에서 최종적으로 비교하거나 설명하려는 값을 떠올려보세요.",
         options: [
             {
                 value: "continuous",
-                label: "📊 숫자 (점수, 시간 등)",
+                label: "숫자로 측정한 결과",
                 description: "예: 통증 점수 7점, 보행 속도 1.2m/s, 악력 25kg"
             },
             {
                 value: "categorical",
-                label: "📋 그룹/종류 (성공/실패 등)",
+                label: "그룹이나 종류로 나눈 결과",
                 description: "예: 치료 성공/실패, 정상/비정상, 경증/중등증/중증"
             }
         ]
@@ -425,8 +425,10 @@ window.AutoStat.QUESTIONS = [
         step: 2,
         id: "dv_level",
         question: "결과 그룹은 몇 가지이고, 순서가 있나요?",
-        help: "💡 결과가 몇 개로 나뉘는지, 순서(등급)가 있는지 선택하세요!",
-        condition: "dv_type === 'categorical'",
+        help: "결과 범주의 개수와 높고 낮음 같은 순서가 있는지 확인하세요.",
+        condition: function(answers) {
+            return answers.dv_type === 'categorical';
+        },
         options: [
             {
                 value: "binary",
@@ -449,7 +451,7 @@ window.AutoStat.QUESTIONS = [
         step: 3,
         id: "iv_count",
         question: "결과에 영향을 주는 '원인/조건'이 몇 개인가요?",
-        help: "💡 비교하거나 예측에 사용할 변수(독립변수)의 개수예요!",
+        help: "결과를 비교하거나 예측할 때 함께 볼 변수의 개수입니다.",
         options: [
             {
                 value: 1,
@@ -467,27 +469,53 @@ window.AutoStat.QUESTIONS = [
         step: 4,
         id: "iv_types",
         question: "'원인/조건' 변수는 어떤 종류인가요?",
-        help: "💡 여러 종류가 섞여있으면 모두 선택하세요!",
+        help: "변수가 1개라면 하나만, 2개 이상이라면 해당하는 종류를 모두 선택하세요.",
         multiSelect: true,
         options: [
             {
                 value: "categorical",
-                label: "📋 그룹 (실험군/대조군 등)",
+                label: "그룹 변수",
                 description: "예: 치료 유형(A/B), 성별(남/녀), 그룹 분류"
             },
             {
                 value: "continuous",
-                label: "📊 숫자 (나이, 횟수 등)",
+                label: "숫자 변수",
                 description: "예: 나이 45세, 치료 횟수 12회, BMI 24.5"
             }
         ]
     },
     {
         step: 5,
+        id: "analysis_goal",
+        question: "숫자 두 개로 무엇을 알고 싶나요?",
+        help: "관계의 정도를 알고 싶은지, 한 값으로 다른 값을 예측하려는지 선택하세요.",
+        condition: function(answers) {
+            return answers.dv_type === 'continuous' && answers.iv_count === 1 &&
+                Array.isArray(answers.iv_types) && answers.iv_types.length === 1 &&
+                answers.iv_types.indexOf('continuous') !== -1;
+        },
+        options: [
+            {
+                value: "relationship",
+                label: "두 값의 관계 확인",
+                description: "예: 치료 횟수와 회복 점수가 함께 변하는지 확인"
+            },
+            {
+                value: "prediction",
+                label: "한 값으로 결과 예측",
+                description: "예: 치료 횟수로 예상 회복 점수를 계산"
+            }
+        ]
+    },
+    {
+        step: 6,
         id: "group_count",
         question: "비교할 그룹이 몇 개인가요?",
         help: "실험군/대조군 = 2개, 치료A/B/C = 3개",
-        condition: "iv_types && iv_types.includes('categorical')",
+        condition: function(answers) {
+            return answers.dv_type === 'continuous' && answers.iv_count === 1 &&
+                Array.isArray(answers.iv_types) && answers.iv_types.indexOf('categorical') !== -1;
+        },
         options: [
             {
                 value: 2,
@@ -502,49 +530,67 @@ window.AutoStat.QUESTIONS = [
         ]
     },
     {
-        step: 6,
+        step: 7,
         id: "paired",
         question: "같은 사람을 여러 번 측정했나요?",
         help: "같은 환자의 '치료 전-후' 비교인지, 다른 환자들 비교인지 선택하세요",
-        condition: "iv_types && iv_types.includes('categorical')",
+        condition: function(answers) {
+            var types = Array.isArray(answers.iv_types) ? answers.iv_types : [];
+            var continuousComparison = answers.dv_type === 'continuous' && (
+                (answers.iv_count === 1 && types.length === 1 && types.indexOf('categorical') !== -1) ||
+                (answers.iv_count >= 2 && types.indexOf('categorical') !== -1 && types.indexOf('continuous') === -1)
+            );
+            var pairedBinaryOutcome = answers.dv_type === 'categorical' && answers.dv_level === 'binary' &&
+                answers.iv_count === 1 && types.length === 1 && types.indexOf('categorical') !== -1;
+            return continuousComparison || pairedBinaryOutcome;
+        },
         options: [
             {
                 value: false,
-                label: "👥 다른 사람들 비교",
+                label: "서로 다른 사람 비교",
                 description: "예: 실험군 20명 vs 대조군 20명 (서로 다른 사람)"
             },
             {
                 value: true,
-                label: "🔄 같은 사람 전-후 비교",
+                label: "같은 사람 반복 측정",
                 description: "예: 환자 20명의 치료 전 점수 vs 치료 후 점수"
             }
         ]
     },
     {
-        step: 7,
+        step: 8,
         id: "normality",
         question: "데이터가 '종 모양(정규분포)'인가요?",
-        help: "💡 잘 모르겠으면 '아니오'를 선택해도 괜찮아요! 비모수 검정이 더 안전해요.",
-        condition: "iv_types && iv_types.includes('categorical') && dv_type === 'continuous'",
+        help: "확인하지 못했다면 '아니오 / 잘 모름'을 선택하세요.",
+        condition: function(answers) {
+            var types = Array.isArray(answers.iv_types) ? answers.iv_types : [];
+            return answers.dv_type === 'continuous' && answers.iv_count === 1 && (
+                types.indexOf('categorical') !== -1 ||
+                (types.length === 1 && types.indexOf('continuous') !== -1 && answers.analysis_goal === 'relationship')
+            );
+        },
         options: [
             {
                 value: true,
-                label: "✅ 예 (정규분포)",
+                label: "예, 정규분포입니다",
                 description: "히스토그램이 종 모양, Shapiro-Wilk p > 0.05"
             },
             {
                 value: false,
-                label: "❌ 아니오 / 잘 모름",
+                label: "아니오 / 잘 모름",
                 description: "데이터가 한쪽으로 치우쳤거나, 표본 수가 적을 때"
             }
         ]
     },
     {
-        step: 8,
+        step: 9,
         id: "has_covariate",
         question: "영향을 빼고 싶은 다른 요인이 있나요?",
-        help: "💡 나이, 성별, 시작 점수 등 결과에 영향을 주지만 관심 없는 변수가 있나요?",
-        condition: "iv_count >= 2 && dv_type === 'continuous'",
+        help: "나이, 성별, 시작 점수처럼 결과에 영향을 줄 수 있어 통제하려는 변수를 뜻합니다.",
+        condition: function(answers) {
+            return answers.iv_count >= 2 && answers.dv_type === 'continuous' &&
+                Array.isArray(answers.iv_types) && answers.iv_types.indexOf('categorical') !== -1;
+        },
         options: [
             {
                 value: false,

@@ -7,6 +7,8 @@ window.AutoStat = window.AutoStat || {};
 
 window.AutoStat.ResultRenderer = {
 
+    _uid: 0,
+
     STEP_LABELS: {
         load: '데이터 로딩',
         preprocess: '데이터 전처리',
@@ -35,6 +37,21 @@ window.AutoStat.ResultRenderer = {
 
         var self = this;
         var orderedSteps = this._orderSteps(results);
+
+        var errorCount = orderedSteps.filter(function(stepId) {
+            return results[stepId] && results[stepId].error;
+        }).length;
+        var overview = document.createElement('div');
+        overview.className = 'analysis-result-overview ' + (errorCount ? 'has-errors' : 'is-complete');
+        var overviewTitle = document.createElement('strong');
+        overviewTitle.textContent = errorCount ? '일부 단계를 확인해주세요.' : '분석이 완료되었습니다.';
+        var overviewText = document.createElement('p');
+        overviewText.textContent = errorCount ?
+            orderedSteps.length + '개 단계 중 ' + errorCount + '개에서 오류가 발생했습니다.' :
+            orderedSteps.length + '개 분석 단계를 모두 실행했습니다.';
+        overview.appendChild(overviewTitle);
+        overview.appendChild(overviewText);
+        container.appendChild(overview);
 
         orderedSteps.forEach(function(stepId) {
             var result = results[stepId];
@@ -65,16 +82,30 @@ window.AutoStat.ResultRenderer = {
         var statusText = hasError ? '오류' : '완료';
 
         // 헤더
-        var header = document.createElement('div');
+        var header = document.createElement('button');
+        header.type = 'button';
         header.className = 'step-header';
-        header.innerHTML =
-            '<span class="step-status ' + statusClass + '">' + statusText + '</span>' +
-            '<h4>' + this._escapeHtml(label) + '</h4>' +
-            '<span class="step-toggle">+</span>';
+        var contentId = 'result-step-content-' + (++this._uid);
+        header.setAttribute('aria-controls', contentId);
+
+        var status = document.createElement('span');
+        status.className = 'step-status ' + statusClass;
+        status.textContent = statusText;
+        var heading = document.createElement('span');
+        heading.className = 'step-title';
+        heading.textContent = label;
+        var toggle = document.createElement('span');
+        toggle.className = 'step-toggle';
+        toggle.setAttribute('aria-hidden', 'true');
+        toggle.textContent = '+';
+        header.appendChild(status);
+        header.appendChild(heading);
+        header.appendChild(toggle);
 
         // 콘텐츠
         var content = document.createElement('div');
         content.className = 'step-content';
+        content.id = contentId;
 
         if (hasError) {
             content.appendChild(this.renderError(result.error));
@@ -88,7 +119,12 @@ window.AutoStat.ResultRenderer = {
         if (result.warnings) {
             var warnEl = document.createElement('div');
             warnEl.className = 'step-warnings';
-            warnEl.innerHTML = '<small>Warning: ' + this._escapeHtml(result.warnings) + '</small>';
+            var warningLabel = document.createElement('strong');
+            warningLabel.textContent = '주의';
+            var warningText = document.createElement('p');
+            warningText.textContent = result.warnings;
+            warnEl.appendChild(warningLabel);
+            warnEl.appendChild(warningText);
             content.appendChild(warnEl);
         }
 
@@ -97,14 +133,16 @@ window.AutoStat.ResultRenderer = {
         if (!isExpanded) {
             content.style.display = 'none';
         } else {
-            header.querySelector('.step-toggle').textContent = '-';
+            toggle.textContent = '-';
         }
+        header.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
 
         // 토글 이벤트
         header.addEventListener('click', function() {
             var isVisible = content.style.display !== 'none';
             content.style.display = isVisible ? 'none' : 'block';
-            header.querySelector('.step-toggle').textContent = isVisible ? '+' : '-';
+            toggle.textContent = isVisible ? '+' : '-';
+            header.setAttribute('aria-expanded', isVisible ? 'false' : 'true');
         });
 
         div.appendChild(header);
@@ -144,23 +182,51 @@ window.AutoStat.ResultRenderer = {
         div.className = 'result-step';
         div.setAttribute('data-step', 'plot');
 
-        var header = document.createElement('div');
+        var header = document.createElement('button');
+        header.type = 'button';
         header.className = 'step-header';
-        header.innerHTML =
-            '<span class="step-status step-done">완료</span>' +
-            '<h4>시각화</h4>' +
-            '<span class="step-toggle">-</span>';
+        var contentId = 'result-step-content-' + (++this._uid);
+        header.setAttribute('aria-controls', contentId);
+        header.setAttribute('aria-expanded', 'true');
+        var status = document.createElement('span');
+        status.className = 'step-status step-done';
+        status.textContent = '완료';
+        var heading = document.createElement('span');
+        heading.className = 'step-title';
+        heading.textContent = '시각화';
+        var toggle = document.createElement('span');
+        toggle.className = 'step-toggle';
+        toggle.setAttribute('aria-hidden', 'true');
+        toggle.textContent = '-';
+        header.appendChild(status);
+        header.appendChild(heading);
+        header.appendChild(toggle);
 
         var content = document.createElement('div');
         content.className = 'step-content';
+        content.id = contentId;
 
         if (plotImages && plotImages.length > 0) {
             for (var i = 0; i < plotImages.length; i++) {
-                var img = document.createElement('img');
-                img.src = plotImages[i].src || plotImages[i];
-                img.className = 'webr-plot-image';
-                img.alt = '분석 결과 그래프';
-                content.appendChild(img);
+                var plot = plotImages[i];
+                if (typeof ImageBitmap !== 'undefined' && plot instanceof ImageBitmap) {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = plot.width;
+                    canvas.height = plot.height;
+                    canvas.className = 'webr-plot-image';
+                    canvas.setAttribute('role', 'img');
+                    canvas.setAttribute('aria-label', '분석 결과 그래프 ' + (i + 1));
+                    var context = canvas.getContext('2d');
+                    if (context) context.drawImage(plot, 0, 0);
+                    if (typeof plot.close === 'function') plot.close();
+                    content.appendChild(canvas);
+                } else {
+                    var img = document.createElement('img');
+                    img.src = plot && plot.src ? plot.src : plot;
+                    img.className = 'webr-plot-image';
+                    img.alt = '분석 결과 그래프 ' + (i + 1);
+                    content.appendChild(img);
+                }
             }
         } else if (result && result.output) {
             var pre = document.createElement('div');
@@ -177,7 +243,8 @@ window.AutoStat.ResultRenderer = {
         header.addEventListener('click', function() {
             var isVisible = content.style.display !== 'none';
             content.style.display = isVisible ? 'none' : 'block';
-            header.querySelector('.step-toggle').textContent = isVisible ? '+' : '-';
+            toggle.textContent = isVisible ? '+' : '-';
+            header.setAttribute('aria-expanded', isVisible ? 'false' : 'true');
         });
 
         div.appendChild(header);

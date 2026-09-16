@@ -1,5 +1,8 @@
 .claude/
+.DS_Store
 __pycache__/
 *.pyc
+*.inspect.ndjson
 nul
 .pdca-status.json
+outputs/qa/

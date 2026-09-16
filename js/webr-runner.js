@@ -11,6 +11,7 @@ window.AutoStat.WebRRunner = {
     isLoading: false,
     _initPromise: null,  // init 재진입 방지용 프로미스 캐시
     loadedPackages: [],
+    cancelRequested: false,
 
     // 콜백
     onProgress: null,   // function(stage, percent, message)
@@ -130,7 +131,7 @@ window.AutoStat.WebRRunner = {
                 self._emitProgress('init', 12, 'R 엔진 초기화 중 (WASM 다운로드)...');
                 await self.webR.init();
                 console.log('[WebRRunner] WebR init 완료!');
-                self._emitProgress('init', 20, 'R 엔진 준비 완료');
+                self._emitProgress('init', 15, 'R 엔진 준비 완료');
 
                 // 2. Core 패키지 설치
                 //    r-universe repos는 WebR R 4.5에서 PACKAGES.rds 미지원으로 실패
@@ -140,7 +141,8 @@ window.AutoStat.WebRRunner = {
                 var totalPkgs = self.CORE_PACKAGES.length;
                 for (var i = 0; i < totalPkgs; i++) {
                     var pkg = self.CORE_PACKAGES[i];
-                    var pct = 20 + Math.round((i / totalPkgs) * 60);
+                    if (self.cancelRequested) throw new Error('사용자가 준비를 취소했습니다.');
+                    var pct = 15 + Math.round((i / totalPkgs) * 25);
                     self._emitProgress('packages', pct, pkg.name + ' 설치 중 (' + (i + 1) + '/' + totalPkgs + ')');
 
                     try {
@@ -148,15 +150,28 @@ window.AutoStat.WebRRunner = {
                         await self.webR.installPackages([pkg.name], {
                             repos: allRepos
                         });
-                        self.loadedPackages.push(pkg.name);
+                        if (self.loadedPackages.indexOf(pkg.name) === -1) self.loadedPackages.push(pkg.name);
                         console.log('[WebRRunner] 패키지 설치 완료:', pkg.name);
                     } catch (e) {
-                        console.warn('패키지 설치 실패 (계속 진행):', pkg.name, e.message);
+                        console.warn('패키지 설치 실패:', pkg.name, e.message);
                     }
                 }
 
+                var missingCore = [];
+                for (var ci = 0; ci < self.CORE_PACKAGES.length; ci++) {
+                    var coreName = self.CORE_PACKAGES[ci].name;
+                    if (await self._isPackageAvailable(coreName)) {
+                        if (self.loadedPackages.indexOf(coreName) === -1) self.loadedPackages.push(coreName);
+                    } else {
+                        missingCore.push(coreName);
+                    }
+                }
+                if (missingCore.length > 0) {
+                    throw new Error('필수 R 패키지를 준비하지 못했습니다: ' + missingCore.join(', '));
+                }
+
                 // 3. 공통 라이브러리 로드
-                self._emitProgress('loading', 85, '라이브러리 로드 중...');
+                self._emitProgress('loading', 42, '라이브러리 로드 중...');
                 for (var li = 0; li < self.loadedPackages.length; li++) {
                     var libName = self.loadedPackages[li];
                     try {
@@ -172,7 +187,7 @@ window.AutoStat.WebRRunner = {
                 self.isReady = true;
                 self.isLoading = false;
                 self._initPromise = null;
-                self._emitProgress('ready', 100, '준비 완료');
+                self._emitProgress('ready', 45, 'R 분석 환경 준비 완료');
                 return true;
 
             } catch (e) {
@@ -200,11 +215,14 @@ window.AutoStat.WebRRunner = {
         // r-universe는 R 4.5에서 미지원 → repo.r-wasm.org만 사용
         var allRepos = [ this.REPOS.wasm ];
 
+        var allAvailable = true;
         for (var i = 0; i < pkgList.length; i++) {
+            if (this.cancelRequested) return false;
             var pkg = pkgList[i];
             if (this.loadedPackages.indexOf(pkg) !== -1) continue;
 
-            this._emitProgress('packages', 0, pkg + ' 추가 설치 중...');
+            var pct = 45 + Math.round(((i + 1) / Math.max(pkgList.length, 1)) * 10);
+            this._emitProgress('packages', pct, pkg + ' 준비 중...');
 
             try {
                 console.log('[WebRRunner] Lazy 패키지 설치:', pkg);
@@ -212,12 +230,19 @@ window.AutoStat.WebRRunner = {
                     repos: allRepos
                 });
                 await this.webR.evalR('suppressWarnings(suppressMessages(library(' + pkg + ')))');
-                this.loadedPackages.push(pkg);
+                if (this.loadedPackages.indexOf(pkg) === -1) this.loadedPackages.push(pkg);
             } catch (e) {
                 console.warn('Lazy 패키지 설치 실패:', pkg, e.message);
+                if (await this._isPackageAvailable(pkg)) {
+                    if (this.loadedPackages.indexOf(pkg) === -1) this.loadedPackages.push(pkg);
+                } else {
+                    allAvailable = false;
+                    this._emitError('필요한 R 패키지를 준비하지 못했습니다: ' + pkg);
+                }
             }
         }
-        return true;
+        this._emitProgress('packages', 55, '분석 도구 준비 완료');
+        return allAvailable;
     },
 
     // ────────────── R 코드 실행 ──────────────
@@ -243,6 +268,7 @@ window.AutoStat.WebRRunner = {
 
     captureOutput: async function(rCode) {
         if (!this.isReady) return { output: '', error: 'WebR 미준비' };
+        if (this.cancelRequested) return { output: '', error: '분석이 취소되었습니다.' };
 
         // R 코드를 논리 블록(빈 줄 기준)별로 tryCatch 감싸기
         // → 블록 A 오류가 블록 B로 전파되지 않음
@@ -284,7 +310,7 @@ window.AutoStat.WebRRunner = {
                 }
             }
 
-            shelter.purge();
+            await shelter.purge();
 
             // tryCatch가 잡은 오류 감지 — 출력은 보존하면서 오류도 표시
             var stepError = null;
@@ -325,6 +351,7 @@ window.AutoStat.WebRRunner = {
 
         // JS API로 패키지 설치 + 로드 (R 측 webr::install보다 안정적)
         for (var p = 0; p < pkgsToLoad.length; p++) {
+            if (this.cancelRequested) return null;
             var pkg = pkgsToLoad[p];
             // 미설치 패키지는 installPackages로 설치
             if (this.loadedPackages.indexOf(pkg) === -1) {
@@ -349,8 +376,9 @@ window.AutoStat.WebRRunner = {
 
         var results = {};
         for (var i = 0; i < steps.length; i++) {
+            if (this.cancelRequested) return null;
             var step = steps[i];
-            var pct = Math.round(((i + 1) / steps.length) * 100);
+            var pct = 60 + Math.round(((i + 1) / steps.length) * 28);
             this._emitProgress('executing', pct, step.label + '...');
 
             var result = await this.captureOutput(step.code);
@@ -366,7 +394,7 @@ window.AutoStat.WebRRunner = {
             }
         }
 
-        this._emitProgress('done', 100, '분석 완료');
+        this._emitProgress('done', 90, '통계 분석 완료');
         return results;
     },
 
@@ -405,6 +433,7 @@ window.AutoStat.WebRRunner = {
 
     captureGraphics: async function(rCode, width, height) {
         if (!this.isReady) return null;
+        if (this.cancelRequested) return null;
 
         width = width || 600;
         height = height || 400;
@@ -414,7 +443,8 @@ window.AutoStat.WebRRunner = {
             // → captureR의 captureGraphics 옵션으로 WebR 내부 디바이스 자동 사용
             var shelter = await new this.webR.Shelter();
             var result = await shelter.captureR(rCode, {
-                captureGraphics: { width: width, height: height }
+                captureGraphics: { width: width, height: height },
+                withAutoprint: true
             });
 
             var images = [];
@@ -424,7 +454,7 @@ window.AutoStat.WebRRunner = {
                 }
             }
 
-            shelter.purge();
+            await shelter.purge();
             return images;
 
         } catch (e) {
@@ -444,6 +474,34 @@ window.AutoStat.WebRRunner = {
         this.isLoading = false;
         this._initPromise = null;
         this.loadedPackages = [];
+        this.cancelRequested = false;
+    },
+
+    resetCancellation: function() {
+        this.cancelRequested = false;
+    },
+
+    cancel: function() {
+        this.cancelRequested = true;
+        if (this.webR && typeof this.webR.interrupt === 'function') {
+            try {
+                var interruption = this.webR.interrupt();
+                if (interruption && typeof interruption.catch === 'function') {
+                    interruption.catch(function() {});
+                }
+            } catch (_) {}
+        }
+    },
+
+    _isPackageAvailable: async function(packageName) {
+        if (!this.webR) return false;
+        try {
+            return await this.webR.evalRBoolean(
+                'requireNamespace("' + String(packageName).replace(/"/g, '\\"') + '", quietly = TRUE)'
+            );
+        } catch (_) {
+            return false;
+        }
     },
 
     // ────────────── 내부 헬퍼 ──────────────

@@ -4,14 +4,23 @@ window.AutoStat = window.AutoStat || {};
 window.AutoStat.StatRecommender = {
 
     recommend: function(userInput) {
-        var dv_type = userInput.dv_type || "continuous";
+        userInput = userInput || {};
+        var dv_type = userInput.dv_type;
         var dv_level = userInput.dv_level || "binary";
         var iv_count = Number(userInput.iv_count) || 1;
-        var iv_types = userInput.iv_types || ["categorical"];
+        var iv_types = Array.isArray(userInput.iv_types) ? userInput.iv_types.slice() : [];
         var group_count = Number(userInput.group_count) || 2;
         var paired = userInput.paired === true;
-        var normality = userInput.normality !== undefined ? userInput.normality === true : true;
+        var normality = userInput.normality === true;
         var has_covariate = userInput.has_covariate === true;
+        var analysis_goal = userInput.analysis_goal || "prediction";
+
+        if (["continuous", "categorical"].indexOf(dv_type) === -1 || iv_types.length === 0) {
+            return { success: false, message: "연구 결과와 비교 변수를 다시 선택해주세요." };
+        }
+        if (iv_count === 1 && iv_types.length !== 1) {
+            return { success: false, message: "비교 변수가 1개라면 변수 종류도 하나만 선택해야 합니다." };
+        }
 
         // IV 유형 분석
         var has_continuous_iv = iv_types.indexOf("continuous") !== -1;
@@ -23,7 +32,7 @@ window.AutoStat.StatRecommender = {
         if (dv_type === "continuous") {
             recommendations = this._recommendContinuousDv(
                 iv_count, iv_types, has_continuous_iv, has_categorical_iv,
-                is_mixed_iv, group_count, paired, normality, has_covariate
+                is_mixed_iv, group_count, paired, normality, has_covariate, analysis_goal
             );
         } else {
             recommendations = this._recommendCategoricalDv(
@@ -50,13 +59,14 @@ window.AutoStat.StatRecommender = {
                 }
             }
         } else {
-            primary = tests["chi_square"];
+            primary = null;
             alternatives = [];
         }
 
         var decision_path = this._buildDecisionPath(
             dv_type, dv_level, iv_count, iv_types,
-            group_count, paired, normality, has_covariate
+            group_count, paired, normality, has_covariate, analysis_goal,
+            typeof userInput.paired === 'boolean', typeof userInput.normality === 'boolean'
         );
 
         return {
@@ -73,7 +83,7 @@ window.AutoStat.StatRecommender = {
     // ==================== 연속형 DV 추천 ====================
     _recommendContinuousDv: function(iv_count, iv_types, has_continuous_iv,
                                       has_categorical_iv, is_mixed_iv, group_count,
-                                      paired, normality, has_covariate) {
+                                      paired, normality, has_covariate, analysis_goal) {
 
         // === 단일 IV ===
         if (iv_count === 1) {
@@ -103,6 +113,11 @@ window.AutoStat.StatRecommender = {
                 }
             } else if (has_continuous_iv && !has_categorical_iv) {
                 // 연속형 IV → 상관/회귀
+                if (analysis_goal === "relationship") {
+                    return normality
+                        ? ["pearson_correlation", "spearman_correlation", "simple_regression"]
+                        : ["spearman_correlation", "pearson_correlation", "simple_regression"];
+                }
                 return ["simple_regression", "pearson_correlation", "spearman_correlation"];
             }
         }
@@ -145,7 +160,7 @@ window.AutoStat.StatRecommender = {
             if (dv_level === "ordinal") {
                 return ["ordinal_regression", "chi_square", "kruskal_wallis"];
             }
-            if (paired) {
+            if (paired && dv_level === "binary") {
                 return ["mcnemar", "chi_square"];
             }
             if (dv_level === "binary") {
@@ -209,7 +224,8 @@ window.AutoStat.StatRecommender = {
 
     // ==================== 의사결정 경로 ====================
     _buildDecisionPath: function(dv_type, dv_level, iv_count, iv_types,
-                                  group_count, paired, normality, has_covariate) {
+                                  group_count, paired, normality, has_covariate,
+                                  analysis_goal, pairedProvided, normalityProvided) {
         var path = [];
 
         // 1. DV 유형
@@ -240,14 +256,23 @@ window.AutoStat.StatRecommender = {
             path.push("숫자로 예측해요 (나이, 치료 횟수 등)");
         }
 
+        if (dv_type === "continuous" && iv_count === 1 &&
+            iv_types.length === 1 && iv_types[0] === "continuous") {
+            path.push(analysis_goal === "relationship"
+                ? "두 숫자의 관계 정도를 확인해요"
+                : "한 숫자로 결과를 예측해요");
+        }
+
         // 4. 그룹 관련 (범주형 IV가 있을 때)
-        if (iv_types.indexOf("categorical") !== -1) {
+        if (dv_type === "continuous" && iv_count === 1 && iv_types.indexOf("categorical") !== -1) {
             if (group_count === 2) {
                 path.push("2개 그룹 비교");
             } else {
                 path.push("3개 이상 그룹 비교");
             }
+        }
 
+        if (pairedProvided) {
             if (paired) {
                 path.push("같은 사람을 여러 번 측정했어요 (전-후 비교)");
             } else {
@@ -256,7 +281,7 @@ window.AutoStat.StatRecommender = {
         }
 
         // 5. 정규성 (연속형 DV + 범주형 IV)
-        if (dv_type === "continuous" && iv_types.indexOf("categorical") !== -1) {
+        if (normalityProvided) {
             if (normality) {
                 path.push("데이터가 정규분포예요 → 모수 검정 사용");
             } else {

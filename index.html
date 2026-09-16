@@ -3,45 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>통계 기법 추천 시스템 v2.0</title>
+    <meta name="description" content="재활 연구 초보자를 위한 통계 방법 추천 및 브라우저 분석 도구">
+    <title>재활 연구 통계 길잡이</title>
+    <link rel="icon" href="images/서울재활병원_가로형CI.png" type="image/png">
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <a class="skip-link" href="#main-content">본문으로 바로가기</a>
     <header>
-        <h1>통계 기법 추천 시스템</h1>
-        <p class="subtitle">재활 연구를 위한 통계 방법 추천</p>
-        <p class="subtitle-small">플로우차트 기반 의사결정 트리와 웹브라우저 R 실행</p>
+        <div class="header-inner">
+            <div>
+                <h1>재활 연구 통계 길잡이</h1>
+                <p class="subtitle">연구 설계에 맞는 분석을 찾고 데이터로 바로 확인하세요</p>
+            </div>
+            <a class="header-guide-link" href="docs/user-guide.html">사용 안내</a>
+        </div>
     </header>
 
-    <main>
+    <main id="main-content" tabindex="-1">
         <!-- 초기 시작 방법 선택 -->
-        <section id="entry-mode-section">
-            <h2 class="entry-title">어떻게 찾으시겠어요?</h2>
-            <div class="entry-mode-cards">
-                <div class="entry-mode-card" id="entry-flow">
-                    <div class="entry-mode-icon">1</div>
-                    <h3>단계별 질문으로 찾기</h3>
-                    <p>몇 가지 질문에 답하면 적합한 통계 방법을 자동으로 추천해드립니다</p>
-                    <ul class="entry-mode-features">
-                        <li>연구 설계 이해에 도움</li>
-                        <li>초보자에게 적합</li>
-                        <li>의사결정 경로 확인 가능</li>
-                    </ul>
-                    <span class="entry-mode-btn">시작하기</span>
-                </div>
-                <div class="entry-mode-card" id="entry-browse">
-                    <div class="entry-mode-icon">2</div>
-                    <h3>통계 기법 목록에서 선택</h3>
-                    <p>26가지 통계 방법을 직접 살펴보고 원하는 방법을 골라 설명을 확인합니다</p>
-                    <ul class="entry-mode-features">
-                        <li>이미 방법을 알고 있을 때</li>
-                        <li>전체 목록 한눈에 보기</li>
-                        <li>빠른 R 코드 생성</li>
-                    </ul>
-                    <span class="entry-mode-btn">목록 보기</span>
-                </div>
+        <section id="entry-mode-section" aria-labelledby="entry-title">
+            <div class="entry-heading">
+                <p class="eyebrow">통계가 처음이어도 괜찮습니다</p>
+                <h2 class="entry-title" id="entry-title">내 연구에 맞는 분석 찾기</h2>
+                <p class="entry-description">연구 질문을 차례로 선택하면 적합한 통계 방법과 재활 연구 예시를 보여드립니다.</p>
             </div>
+            <div class="entry-mode-cards">
+                <button type="button" class="entry-mode-card entry-mode-primary" id="entry-flow">
+                    <span class="entry-mode-tag">처음이라면</span>
+                    <span class="entry-mode-heading">질문으로 추천받기</span>
+                    <span class="entry-mode-copy">결과 변수와 연구 설계를 쉬운 예시로 선택합니다.</span>
+                    <span class="entry-mode-btn">추천 시작</span>
+                </button>
+                <button type="button" class="entry-mode-card" id="entry-browse">
+                    <span class="entry-mode-tag">방법을 안다면</span>
+                    <span class="entry-mode-heading">통계 방법 직접 선택</span>
+                    <span class="entry-mode-copy">지원하는 분석 목록에서 바로 찾습니다.</span>
+                    <span class="entry-mode-btn">목록 열기</span>
+                </button>
+            </div>
+            <p class="entry-safety-note">이 도구는 분석 선택과 학습을 돕습니다. 최종 연구 설계와 해석은 지도자 또는 통계 전문가와 확인하세요.</p>
         </section>
 
         <!-- 통계 기법 목록 탐색 -->
@@ -61,11 +63,11 @@
             <div class="browse-header">
                 <button id="btn-flow-back" class="btn btn-outline btn-sm">← 처음으로</button>
             </div>
-            <div id="progress-bar">
-                <div id="progress-fill"></div>
+            <div id="progress-bar" role="progressbar" aria-label="추천 질문 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="progress-fill" aria-hidden="true"></div>
                 <span id="progress-text"></span>
             </div>
-            <div id="question-container"></div>
+            <div id="question-container" aria-live="polite"></div>
             <div id="nav-buttons">
                 <button id="btn-back" class="btn btn-secondary" style="display:none;">&larr; 이전</button>
                 <button id="btn-restart" class="btn btn-outline" style="display:none;">처음부터</button>
@@ -74,14 +76,9 @@
 
         <!-- 결과 섹션 -->
         <section id="result-section" style="display:none;">
-            <!-- 의사결정 경로 -->
-            <div id="decision-path-container">
-                <h3>분석 경로</h3>
-                <div id="decision-path"></div>
-            </div>
-
             <!-- 추천 결과 -->
             <div id="primary-result">
+                <p class="result-kicker">추천 분석</p>
                 <h2 id="result-title"></h2>
                 <div id="result-name-en" class="name-en"></div>
 
@@ -90,14 +87,15 @@
                     <p id="result-simple-desc"></p>
                 </div>
 
-                <div class="result-box analogy-box">
-                    <h4 id="result-analogy-title"></h4>
-                    <p id="result-analogy"></p>
-                </div>
-
-                <div class="result-box rehab-box">
-                    <h4 id="result-rehab-title"></h4>
-                    <p id="result-rehab"></p>
+                <div class="result-context-grid">
+                    <div class="result-box rehab-box">
+                        <h4 id="result-rehab-title"></h4>
+                        <p id="result-rehab"></p>
+                    </div>
+                    <div class="result-box analogy-box">
+                        <h4 id="result-analogy-title"></h4>
+                        <p id="result-analogy"></p>
+                    </div>
                 </div>
 
                 <details class="detail-section">
@@ -116,41 +114,44 @@
                 </details>
             </div>
 
+            <!-- 의사결정 경로 -->
+            <details id="decision-path-container">
+                <summary>이 방법이 추천된 이유</summary>
+                <div id="decision-path"></div>
+            </details>
+
             <!-- 대안 -->
             <div id="alternatives-container" style="display:none;">
                 <h3>다른 방법도 있어요</h3>
                 <div id="alternatives-list"></div>
             </div>
 
+            <aside class="analysis-safety-note" aria-label="분석 전 확인">
+                <strong>분석 전 확인</strong>
+                <p>추천 결과만으로 방법을 확정하지 마세요. 표본 수, 결측치, 가정 검정과 임상적 의미를 함께 확인해야 합니다.</p>
+            </aside>
+
             <!-- [NEW] 분석 모드 선택 -->
             <section id="analysis-mode-section">
-                <h3>데이터 분석 방법 선택</h3>
-                <p class="section-subtitle">추천된 통계 방법으로 분석을 진행하세요</p>
+                <h3>다음 단계</h3>
                 <div class="mode-cards">
-                    <div class="mode-card" id="mode-webr">
-                        <h4>브라우저에서 바로 실행</h4>
-                        <p class="mode-desc">R 설치 없이 여기서 바로 분석합니다</p>
-                        <ul class="mode-features">
-                            <li>데이터 파일 업로드</li>
-                            <li>자동 통계 분석 실행</li>
-                            <li>결과 즉시 확인</li>
-                        </ul>
-                    </div>
-                    <div class="mode-card" id="mode-code">
-                        <h4>R 코드 생성</h4>
-                        <p class="mode-desc">내 컴퓨터의 R/RStudio에서 실행할 코드를 만듭니다</p>
-                        <ul class="mode-features">
-                            <li>맞춤형 R 스크립트 생성</li>
-                            <li>복사 또는 .R 파일 다운로드</li>
-                            <li>고급 사용자 추천</li>
-                        </ul>
-                    </div>
+                    <button type="button" class="mode-card mode-card-primary" id="mode-webr" aria-pressed="false">
+                        <span class="mode-label">권장</span>
+                        <span class="mode-title">파일로 바로 분석</span>
+                        <span class="mode-desc">Excel 또는 CSV 파일을 올려 결과를 확인합니다.</span>
+                    </button>
+                    <button type="button" class="mode-card" id="mode-code" aria-pressed="false">
+                        <span class="mode-label">R 사용자</span>
+                        <span class="mode-title">R 코드 만들기</span>
+                        <span class="mode-desc">RStudio에서 실행할 분석 코드를 생성합니다.</span>
+                    </button>
                 </div>
             </section>
 
             <!-- [NEW] 파일 업로드 (WebR 모드) -->
             <section id="file-upload-section" style="display:none;">
                 <h3>데이터 파일 업로드</h3>
+                <p class="privacy-note">파일은 이 브라우저 안에서만 처리되며 서버로 전송되지 않습니다.</p>
                 <div id="file-dropzone" class="dropzone">
                     <p class="dropzone-title">파일을 여기에 끌어다 놓으세요</p>
                     <p class="dropzone-or">또는</p>
@@ -171,6 +172,7 @@
                     <div id="webr-variable-mapping" style="display:none;">
                         <!-- 변수 매핑 (동적 생성) -->
                     </div>
+                    <div id="webr-validation-summary" class="validation-summary" style="display:none;" aria-live="polite"></div>
                     <div class="button-group" id="file-action-buttons" style="display:none;">
                         <button id="btn-run-webr" class="btn btn-primary">분석 실행</button>
                         <button id="btn-cancel-webr" class="btn btn-secondary">취소</button>
@@ -180,21 +182,21 @@
 
             <!-- [NEW] WebR 로딩 상태 -->
             <section id="webr-loading-section" style="display:none;">
-                <div class="webr-progress">
+                <div class="webr-progress" aria-live="polite">
                     <h4 id="webr-loading-title">R 분석 환경 준비 중...</h4>
-                    <div class="webr-progress-bar">
+                    <div class="webr-progress-bar" role="progressbar" aria-label="R 분석 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                         <div id="webr-progress-fill" class="webr-progress-fill"></div>
                     </div>
                     <p id="webr-progress-text">초기화 중...</p>
-                    <p class="help-text">첫 실행 시 약 30초 소요됩니다 (다음부터는 더 빠릅니다)</p>
+                    <p class="help-text">첫 실행은 네트워크 환경에 따라 1~3분 걸릴 수 있습니다.</p>
                     <button id="btn-cancel-loading" class="btn btn-outline" style="margin-top:1rem;">취소하고 돌아가기</button>
                 </div>
             </section>
 
             <!-- [NEW] WebR 실행 결과 -->
-            <section id="webr-result-section" style="display:none;">
+            <section id="webr-result-section" style="display:none;" aria-live="polite">
                 <h3>분석 결과</h3>
-                <p class="section-subtitle" id="webr-result-subtitle">WebR 브라우저 실행 결과</p>
+                <p class="section-subtitle" id="webr-result-subtitle">본분석 결과와 효과크기를 중심으로 확인하세요.</p>
                 <div id="webr-results">
                     <!-- ResultRenderer가 동적으로 생성 -->
                 </div>
@@ -202,8 +204,8 @@
 
             <!-- R 코드 커스터마이저 (기존 — 코드 생성 모드) -->
             <section id="r-code-customizer" style="display:none;">
-                <h3>R 코드 커스터마이저</h3>
-                <p class="section-subtitle">당신의 데이터에 맞게 R 코드를 자동으로 수정하세요</p>
+                <h3>R 코드 만들기</h3>
+                <p class="section-subtitle">RStudio에서 사용할 데이터 열을 연결합니다.</p>
                 <p class="customizer-test-label">현재 테스트: <strong id="customizer-test-name">-</strong></p>
 
                 <div class="customizer-card">
@@ -212,14 +214,14 @@
                         <h4>Step 1. 데이터 파일 정보 입력</h4>
 
                         <div class="file-input-group">
-                            <label class="input-label">엑셀/CSV 파일 경로 (선택사항)</label>
+                            <label class="input-label" for="file-path-input">Excel/CSV 파일 경로 (선택)</label>
                             <p class="help-text">R에서 파일을 불러올 경로를 입력하세요</p>
                             <input type="text" id="file-path-input" class="input-text"
                                    placeholder="예: C:/Users/홍길동/Desktop/data.xlsx">
                         </div>
 
                         <div class="file-format-group">
-                            <label class="input-label">파일 형식</label>
+                            <label class="input-label" for="file-format-select">파일 형식</label>
                             <select id="file-format-select" class="select-control">
                                 <option value="xlsx">Excel (.xlsx)</option>
                                 <option value="csv">CSV (.csv)</option>
@@ -227,7 +229,7 @@
                         </div>
 
                         <div class="column-input-group">
-                            <label class="input-label">엑셀 컬럼 (열 이름) 입력</label>
+                            <label class="input-label" for="column-input">데이터 열 이름 입력</label>
                             <p class="help-text">엑셀의 헤더 행을 복사해서 붙여넣으세요 (쉼표, 탭, 줄바꿈 모두 지원)</p>
                             <textarea id="column-input"
                                       class="input-textarea"
@@ -280,13 +282,13 @@
 
             <!-- PubMed 논문 검색 -->
             <div id="pubmed-section">
-                <h3>관련 논문 검색 &mdash; PubMed</h3>
+                <h3>관련 재활 논문 찾기</h3>
                 <div class="search-controls">
                     <label for="therapy-field-select">재활 분야:</label>
                     <select id="therapy-field-select"></select>
                     <label class="sci-filter-label">
                         <input type="checkbox" id="sci-filter-checkbox" checked>
-                        <span>SCI-E급 저널만 표시</span>
+                        <span>주요 재활·의학 저널만</span>
                     </label>
                     <button id="btn-search-papers" class="btn btn-primary">논문 검색</button>
                 </div>
@@ -305,7 +307,8 @@
     </main>
 
     <footer>
-        <p>재활 연구를 위한 통계 기법 추천 시스템 v2.0 by 자작나무</p>
+        <p>재활 연구 통계 길잡이 v2.1 by 자작나무</p>
+        <p><a href="docs/user-guide.html">사용 안내 및 데이터 준비 방법</a></p>
         <div class="footer-logo">
             <img src="images/서울재활병원_가로형CI.png" alt="서울재활병원">
         </div>
@@ -318,10 +321,12 @@
     <script src="js/stat-data.js"></script>
     <script src="js/stat-recommender.js"></script>
     <script src="js/pubmed-search.js"></script>
+    <script src="js/data-validator.js"></script>
     <script src="js/r-code-customizer.js"></script>
     <script src="js/webr-runner.js"></script>
     <script src="js/webr-adaptor.js"></script>
     <script src="js/result-renderer.js"></script>
     <script src="js/app.js"></script>
+    <noscript><p class="noscript-message">이 프로그램을 사용하려면 브라우저에서 JavaScript를 허용해주세요.</p></noscript>
 </body>
 </html>

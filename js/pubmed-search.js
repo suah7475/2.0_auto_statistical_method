@@ -24,7 +24,11 @@ window.AutoStat.STAT_SEARCH_TERMS = {
     "two_way_anova": "two-way ANOVA",
     "mixed_anova": "mixed ANOVA OR mixed model ANOVA",
     "point_biserial": "point-biserial correlation",
-    "ordinal_regression": "ordinal logistic regression OR proportional odds"
+    "ordinal_regression": "ordinal logistic regression OR proportional odds",
+    "glm_covariate": "general linear model covariate OR adjusted linear model",
+    "dummy_regression": "dummy variable regression OR categorical predictor regression",
+    "glm_anova": "general linear model ANOVA OR multiple linear model",
+    "multinomial_logistic": "multinomial logistic regression"
 };
 
 // 재활 분야 검색어
@@ -177,7 +181,9 @@ window.AutoStat.PubMedSearcher = {
             return '"' + t + '"[Title/Abstract]';
         }).join(" OR ");
         var query = '(' + statTerm + ')[Title/Abstract] AND (' + rehabQuery + ')';
-        query += ' AND ("2015"[Date - Publication] : "3000"[Date - Publication])';
+        var currentYear = new Date().getFullYear();
+        var startYear = currentYear - 9;
+        query += ' AND ("' + startYear + '"[Date - Publication] : "' + currentYear + '"[Date - Publication])';
 
         // SCI 필터 적용 시 3배 더 검색 (필터 후 줄어들므로)
         var fetchCount = sciFilter ? maxResults * 3 : maxResults;
@@ -231,12 +237,12 @@ window.AutoStat.PubMedSearcher = {
 
     _filterSciJournals: function(papers) {
         var whitelist = window.AutoStat.SCI_REHAB_JOURNALS;
+        var self = this;
         return papers.filter(function(paper) {
             if (!paper.journal) return false;
-            var journalLower = paper.journal.toLowerCase();
+            var normalizedJournal = self._normalizeJournalName(paper.journal);
             return whitelist.some(function(sciJournal) {
-                return journalLower.indexOf(sciJournal.toLowerCase()) !== -1 ||
-                       sciJournal.toLowerCase().indexOf(journalLower) !== -1;
+                return normalizedJournal === self._normalizeJournalName(sciJournal);
             });
         }).map(function(paper) {
             paper.is_sci = true;
@@ -246,11 +252,21 @@ window.AutoStat.PubMedSearcher = {
 
     isSciJournal: function(journalName) {
         if (!journalName) return false;
-        var journalLower = journalName.toLowerCase();
+        var normalizedJournal = this._normalizeJournalName(journalName);
+        var self = this;
         return window.AutoStat.SCI_REHAB_JOURNALS.some(function(sciJournal) {
-            return journalLower.indexOf(sciJournal.toLowerCase()) !== -1 ||
-                   sciJournal.toLowerCase().indexOf(journalLower) !== -1;
+            return normalizedJournal === self._normalizeJournalName(sciJournal);
         });
+    },
+
+    _normalizeJournalName: function(journalName) {
+        return String(journalName || '')
+            .toLowerCase()
+            .replace(/^the\s+/, '')
+            .replace(/&/g, 'and')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim()
+            .replace(/\s+/g, ' ');
     },
 
     _rateLimitWait: function() {
@@ -272,7 +288,6 @@ window.AutoStat.PubMedSearcher = {
             term: query,
             retmax: String(maxResults),
             retmode: "json",
-            email: "researcher@example.com",
             sort: "relevance"
         });
 
@@ -292,8 +307,7 @@ window.AutoStat.PubMedSearcher = {
         var params = new URLSearchParams({
             db: "pubmed",
             id: pmids.join(","),
-            retmode: "xml",
-            email: "researcher@example.com"
+            retmode: "xml"
         });
 
         var response = await fetch(this.BASE_URL + "efetch.fcgi?" + params.toString());
